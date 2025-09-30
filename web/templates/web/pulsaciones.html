@@ -1,0 +1,97 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Ritmo Cardíaco Realista</title>
+  <link rel="stylesheet" href="{% static 'web/styles/style.css' %}">
+  <style>
+    /* Modal básico */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 15% auto;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 500px;
+    }
+    .close {
+      float: right;
+      font-size: 24px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Simulador de Ritmo Cardíaco</h1>
+
+  <button id="sessionButton">Iniciar Sesión de Actividad</button>
+
+  <div id="graficaContainer">
+    <canvas id="grafica"></canvas>
+  </div>
+
+<!-- Modal de sesión -->
+<div id="sessionModal" class="modal">
+  <div class="modal-content">
+    <span class="close" id="closeModal">&times;</span>
+    <h3>Terminar Sesión</h3>
+    <form id="sessionForm" style="display: flex; flex-direction: column; gap: 12px;">
+
+      <label for="cita">Cita (opcional):</label>
+      <input type="number" id="cita" name="cita" placeholder="ID de la cita" />
+
+      <label for="ubicacion_inicial">Ubicación Inicial:</label>
+      <input type="number" step="any" id="ubicacion_inicial" name="ubicacion_inicial" required />
+
+      <label for="ubicacion_final">Ubicación Final:</label>
+      <input type="number" step="any" id="ubicacion_final" name="ubicacion_final" required />
+
+      <label for="ruta">Ruta:</label>
+      <input type="number" id="ruta" name="ruta" required />
+
+      <button type="submit" style="margin-top: 10px; padding: 10px 15px; border-radius: 8px; background-color:#228B22; color:#fff; font-weight:bold; border:none; cursor:pointer;">
+        Guardar Sesión
+      </button>
+    </form>
+  </div>
+</div>
+
+
+  <!-- Gráficas -->
+  <h2 id="eventoActual" style="text-align:center; margin: 10px 0;">Evento: -- | Latidos: -- lpm</h2>
+  <div id="contenedor-oficinista" style="display: flex; justify-content: center; align-items: center; margin: 20px auto; max-width: 900px; max-height: 600px;">
+    <canvas id="grafica-oficinista" style="max-width: 100%; width: 100%;"></canvas>
+  </div>
+
+  <h2 id="eventoAdolescente" style="text-align:center; margin: 10px 0;">Evento: -- | Latidos: -- lpm</h2>
+  <div id="contenedor-adolescente" style="display: flex; justify-content: center; align-items: center; margin: 20px auto; max-width: 900px; max-height: 600px;">
+    <canvas id="grafica-adolescente" style="max-width: 100%; width: 100%;"></canvas>
+  </div>
+
+  <h2 id="viejoeven" style="text-align:center; margin: 10px 0;">Evento: -- | Latidos: -- lpm</h2>
+  <div id="contenedor-viejon" style="display: flex; justify-content: center; align-items: center; margin: 20px auto; max-width: 900px; max-height: 600px;">
+    <canvas id="viejon_grf" style="max-width: 100%; width: 100%;"></canvas>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="{% static 'web/scripts/grafica.js' %}"></script>
+  <script src="{% static 'web/scripts/oficinista.js' %}"></script>
+  <script src="{% static 'web/scripts/adolescente.js' %}"></script>
+  <script src="{% static 'web/scripts/viejon.js' %}"></script>
+  <script src="{% static 'web/scripts/guardarSession.js' %}"></script>
+</body>
+</html>

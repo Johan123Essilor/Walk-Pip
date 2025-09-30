@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Rutas de Montaña</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Roboto', sans-serif; background: #FFF5EE; margin: 0; padding: 0; color: #333; }
+    h1 { text-align: center; padding: 20px; background: #D2691E; color: #fff; margin:0; font-size:2em; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);}
+    #map { height: 450px; margin: 20px auto; max-width: 90%; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .modal { display: none; position: fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color: rgba(0,0,0,0.6); justify-content:center; align-items:center; padding:10px;}
+    .modal-content { background-color: #fff8f0; padding:25px; border-radius:20px; max-width:800px; width:95%; max-height:90%; overflow-y:auto; box-shadow:0 6px 20px rgba(0,0,0,0.3); position:relative; display:flex; flex-direction:column; gap:15px; }
+    .close { position:absolute; top:15px; right:20px; cursor:pointer; font-size:28px; color:#D2691E; font-weight:bold; transition:color 0.3s; }
+    .close:hover { color:#8B0000; }
+    img { width:100%; border-radius:15px; margin:15px 0; box-shadow:0 3px 10px rgba(0,0,0,0.2); }
+    .contenido { display:flex; flex-wrap:wrap; gap:20px; }
+    .info { flex:1 1 300px; }
+    .clima-box { background-color:#FFE4C4; border-radius:12px; padding:15px; text-align:center; box-shadow:inset 0 0 10px rgba(0,0,0,0.05); }
+    .clima-icon { width:60px; vertical-align:middle; margin-bottom:10px; }
+    .alert { color:#B22222; font-weight:bold; margin-top:10px; }
+    input, select { padding:8px 10px; border-radius:8px; border:1px solid #ccc; margin:5px 0; width:calc(50% - 10px); }
+    button { padding:10px 20px; border:none; border-radius:10px; background-color:#228B22; color:#fff; font-weight:bold; cursor:pointer; transition:background-color 0.3s; margin-top:5px; }
+    button:hover { background-color:#006400; }
+    #climaSeleccionado { margin-top:10px; font-weight:bold; text-align:center; }
+    @media(max-width:700px){ .contenido { flex-direction:column; } input{ width:100%; } }
+  </style>
+</head>
+<body>
+  <h1>🌄 Rutas de Montaña</h1>
+  <div id="map"></div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span id="cerrar" class="close">&times;</span>
+      <div id="detalleRuta"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // --- Configuración de lugares ---
+    const lugares = [
+      {id:1, nombre: "Cerro de la Silla", lat: 25.6047, lon: -100.2511, fotos:["https://upload.wikimedia.org/wikipedia/commons/6/64/Cerro_de_la_Silla.jpg"], descripcion:"Un ícono de Monterrey, ruta exigente pero con vistas espectaculares.", recomendaciones:"Lleva agua, bloqueador y ropa ligera."},
+      {id:2, nombre: "Nevado de Toluca", lat:19.1080, lon:-99.7586, fotos:["https://upload.wikimedia.org/wikipedia/commons/f/fc/Nevado_de_Toluca.jpg"], descripcion:"Volcán imponente con lagunas en su cráter.", recomendaciones:"Sube temprano y lleva abrigo, hace mucho frío." }
+    ];
+
+    const map = L.map('map').setView([23.6345,-102.5528],5);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
+
+    const modal = document.getElementById("modal");
+    const detalleRuta = document.getElementById("detalleRuta");
+    const cerrar = document.getElementById("cerrar");
+    cerrar.onclick = ()=> modal.style.display="none";
+
+    // --- Funciones de clima ---
+    async function obtenerClima(lat,lon){
+      try{
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=celsius&windspeed_unit=kmh&timezone=America/Monterrey`);
+        const data = await res.json();
+        return { descripcion: interpretarCodigo(data.current_weather.weathercode), temperatura:data.current_weather.temperature, viento:data.current_weather.windspeed };
+      }catch(err){ console.error(err); return { descripcion:{text:"No disponible",icon:""}, temperatura:"N/A", viento:"N/A"}; }
+    }
+
+    async function obtenerClimaPorHora(lat,lon){
+      try{
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weathercode&timezone=America/Monterrey`);
+        const data = await res.json();
+        return data.hourly;
+      }catch(err){ console.error(err); return null; }
+    }
+
+    function interpretarCodigo(codigo){
+      if(codigo===0) return {text:"Despejado", icon:"https://i.ibb.co/7QpKsCX/sun.png"};
+      if(codigo===1||codigo===2||codigo===3) return {text:"Parcialmente nublado", icon:"https://i.ibb.co/3C0FJ7b/cloud-sun.png"};
+      if(codigo===45||codigo===48) return {text:"Niebla", icon:"https://i.ibb.co/YkDbV4P/fog.png"};
+      if(codigo>=51&&codigo<=67) return {text:"Lluvia ligera a moderada", icon:"https://i.ibb.co/yY3g2Nf/rain.png"};
+      if(codigo>=71&&codigo<=77) return {text:"Nieve", icon:"https://i.ibb.co/0XvGv3X/snow.png"};
+      if(codigo>=80&&codigo<=86) return {text:"Lluvia con tormenta", icon:"https://i.ibb.co/yY3g2Nf/rain.png"};
+      if(codigo>=95&&codigo<=99) return {text:"Tormenta severa", icon:"https://i.ibb.co/0jLsvvF/storm.png"};
+      return {text:"Desconocido", icon:""};
+    }
+
+    // --- Función para obtener CSRF token ---
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // --- Agregar marcadores ---
+    lugares.forEach(lugar=>{
+      const marker = L.marker([lugar.lat,lugar.lon]).addTo(map);
+      marker.on("click", async ()=>{
+        const clima = await obtenerClima(lugar.lat,lugar.lon);
+        const fotosHTML = lugar.fotos.map(f=>`<img src="${f}" alt="${lugar.nombre}">`).join("");
+
+        detalleRuta.innerHTML = `
+          <h2 style="color:#D2691E;">${lugar.nombre}</h2>
+          ${fotosHTML}
+          <div class="contenido">
+            <div class="info">
+              <p><b>Descripción:</b> ${lugar.descripcion}</p>
+              <p><b>Recomendaciones:</b> ${lugar.recomendaciones}</p>
+            </div>
+            <div class="clima-box">
+              <img class="clima-icon" src="${clima.descripcion.icon}" alt="icono">
+              <p><b>Clima actual:</b> ${clima.descripcion.text}</p>
+              <p><b>Temperatura:</b> ${clima.temperatura}°C</p>
+              <p><b>Viento:</b> ${clima.viento} km/h</p>
+            </div>
+          </div>
+          <hr>
+          <p><b>Consultar clima para otra fecha/hora:</b></p>
+          <input type="date" id="fechaClima">
+          <input type="time" id="horaClima">
+          <button id="verClimaHora">Ver clima</button>
+          <p id="climaSeleccionado"></p>
+          <button id="agendarCita" style="background-color:#D2691E;">Agendar cita</button>
+        `;
+
+        modal.style.display="flex";
+        map.setView([lugar.lat,lugar.lon],12);
+
+        let climaHoraTexto = "";
+
+        document.getElementById("verClimaHora").onclick = async ()=>{
+            const fecha = document.getElementById("fechaClima").value;
+            const hora = document.getElementById("horaClima").value; 
+            if(!fecha||!hora){ alert("Selecciona fecha y hora"); return; }
+
+            const hourly = await obtenerClimaPorHora(lugar.lat,lugar.lon);
+            if(hourly){
+                const datetimeSel = new Date(`${fecha}T${hora}:00`);
+                let closestIndex = 0; let minDiff=Infinity;
+                hourly.time.forEach((t,i)=>{
+                    const diff = Math.abs(new Date(t)-datetimeSel);
+                    if(diff<minDiff){ minDiff=diff; closestIndex=i; }
+                });
+                const codigoObj = interpretarCodigo(hourly.weathercode[closestIndex]);
+                const temp = hourly.temperature_2m[closestIndex];
+                climaHoraTexto = `${codigoObj.text}, Temp: ${temp}°C`;
+                document.getElementById("climaSeleccionado").innerHTML = `
+                  <img class="clima-icon" src="${codigoObj.icon}" alt="icono">
+                  <b>Clima cercano a las ${hora} del ${fecha}:</b> ${climaHoraTexto}
+                `;
+            } else { 
+                document.getElementById("climaSeleccionado").innerHTML="No se pudo obtener clima por hora"; 
+            }
+        };
+
+        document.getElementById("agendarCita").onclick = async ()=> {
+            const usuarioId = localStorage.getItem("usuario_id");
+            if (!usuarioId) {
+                alert("⚠️ Primero debes iniciar sesión antes de agendar una cita.");
+                return;
+            }
+
+            const fecha = document.getElementById("fechaClima").value;
+            const hora = document.getElementById("horaClima").value; 
+            const fechaVisitaISO = `${fecha}T${hora}:00`;
+
+            if(!fecha || !hora || !climaHoraTexto){ 
+                alert("Selecciona fecha, hora y consulta el clima antes de agendar."); 
+                return; 
+            }
+
+            const cita = {
+                usuario: usuarioId,
+                ruta: lugar.id,
+                fecha_visita: fechaVisitaISO,
+                hora_retorno: fechaVisitaISO,
+                clima: climaHoraTexto,
+                recomendaciones: lugar.recomendaciones,
+                compania: "N/A"
+            };
+
+            try {
+                const res = await fetch("http://127.0.0.1:8000/api/agendar/", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrftoken
+                    },
+                    body: JSON.stringify(cita)
+                });
+
+                const data = await res.json();
+                if(res.ok){ 
+                    alert("✅ Cita agendada correctamente."); 
+                    modal.style.display="none"; 
+                } else { 
+                    console.error(data);
+                    alert("❌ Error al agendar cita: " + JSON.stringify(data)); 
+                }
+
+            } catch(err) { 
+                console.error(err); 
+                alert("❌ Error al comunicarse con el servidor."); 
+            }
+        };
+
+      });
+    });
+  </script>
+</body>
+</html>

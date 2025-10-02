@@ -1,7 +1,8 @@
+from datetime import timezone
 from rest_framework.response import Response
 from rest_framework import status, viewsets, generics
-from .models import Cita, Usuario, SessionActividad, MetricaCaminata
-from .serializers import CitaSerializer, UsuarioSerializer, SessionActividadSerializer, ToggleSessionSerializer, SessionStatusSerializer, MetricaCaminataSerializer
+from .models import Cita, MetricaCorazon, Usuario, SessionActividad, MetricaCaminata
+from .serializers import CitaSerializer, MetricaCorazonSerializer, UsuarioSerializer, SessionActividadSerializer, ToggleSessionSerializer, SessionStatusSerializer, MetricaCaminataSerializer
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, login
 from django.utils.decorators import method_decorator
@@ -113,6 +114,14 @@ class MetricaCaminataViewSet(viewsets.ModelViewSet):
     queryset = MetricaCaminata.objects.all()
     serializer_class = MetricaCaminataSerializer
     permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        # opcional: asociar la sesión que viene del body
+        serializer.save()
+
+class MetricaCorazonViewSet(viewsets.ModelViewSet):
+    queryset = MetricaCorazon.objects.all()
+    serializer_class = MetricaCorazonSerializer
 
     def perform_create(self, serializer):
         # opcional: asociar la sesión que viene del body

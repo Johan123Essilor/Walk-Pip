@@ -6,6 +6,8 @@ let rngMinAd = 40;
 let rngMaxAd = 60;
 let adolescenteChart = null;
 const mxPuntosAd = 12;
+let presion = null;
+let oxigenacion = null;
 
 // Estructura de eventos para el adolescente
 const eventosAdolescente = [
@@ -62,6 +64,34 @@ function seleccionarEventoAdolescente() {
     eventoAdolescente = 'reposo';
 }
 
+function calcularPresionYOxigenacionAdolescente(ritmo) {
+    let sistolica, diastolica, oxigeno;
+
+    // Presión basada en ritmo
+    if (ritmo < 60) { // reposo
+        sistolica = Math.floor(110 + Math.random() * 10); // 110–119
+        diastolica = Math.floor(70 + Math.random() * 5);  // 70–74
+    } else if (ritmo < 100) { // actividad ligera
+        sistolica = Math.floor(120 + Math.random() * 10); // 120–129
+        diastolica = Math.floor(75 + Math.random() * 10); // 75–84
+    } else if (ritmo < 160) { // ejercicio intenso
+        sistolica = Math.floor(130 + Math.random() * 15); // 130–144
+        diastolica = Math.floor(80 + Math.random() * 10); // 80–89
+    } else { // susto o estrés extremo
+        sistolica = Math.floor(150 + Math.random() * 30); // 150–180
+        diastolica = Math.floor(90 + Math.random() * 10); // 90–99
+    }
+
+    // Saturación de oxígeno
+    if (ritmo < 160) {
+        oxigeno = Math.floor(95 + Math.random() * 5); // 95–99%
+    } else {
+        oxigeno = Math.floor(92 + Math.random() * 3); // 92–94%
+    }
+
+    return { sistolica, diastolica, oxigeno };
+}
+
 function generarRitmoAdolescente() {
     const ahora = new Date();
 
@@ -89,6 +119,14 @@ function generarRitmoAdolescente() {
         }
     }
 
+     // **Aquí llamamos a la función y obtenemos las variables**
+    const { sistolica, diastolica, oxigeno } = calcularPresionYOxigenacionAdolescente(ritmoAdolescente);
+
+     // Aquí ya puedes calcular la presión como string o número
+    presion = `${sistolica}/${diastolica}`;
+     oxigenacion= oxigeno;
+   
+     enviarMetricaAdolescente(18, ritmoAdolescente, sistolica, diastolica, oxigeno); // sessionId fijo 
     // Guardar datos
     etiquetasAdolescente.push(ahora.toLocaleTimeString());
     datosAdolescente.push(ritmoAdolescente);
@@ -100,10 +138,36 @@ function generarRitmoAdolescente() {
     // Mostrar evento
     const eventoElem = document.getElementById('eventoAdolescente');
     if (eventoElem) {
-        eventoElem.textContent = `Evento: Adolescente | Latidos: ${ritmoAdolescente} lpm`;
+        eventoElem.textContent = `Evento:  ${eventoAdolescente} | Latidos: ${ritmoAdolescente} lpm`;
     }
 
     actualizarGraficaAdolescente();
+}
+
+    function enviarMetricaAdolescente(sessionId, ritmoAdolescente, sistolica, diastolica, oxigeno) {
+    fetch("http://127.0.0.1:8000/api/metrica-corazon/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            session: 18,                      // el id de SessionActividad
+            ritmo_cardiaco: ritmoAdolescente,                   // el ritmo actual
+            presion: parseFloat(`${sistolica}.${diastolica}`), // o guárdala como string si prefieres
+            oxigenacion: oxigeno,
+            fecha_hora: new Date().toISOString()     // ISO para DRF
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Error al enviar datos");
+        return res.json();
+    })
+    .then(data => {
+        console.log("Métrica guardada:", data);
+    })
+    .catch(err => {
+        console.error("Error al enviar métrica:", err);
+    });
 }
 
 function actualizarGraficaAdolescente() {
@@ -156,8 +220,10 @@ window.addEventListener('DOMContentLoaded', () => {
     // Forzar primer estado: reposo
     rngMinAd = 40;
     rngMaxAd = 60;
-    eventoAdolescente = "Adolescente";
+     // Seleccionar un primer evento al arrancar
+    seleccionarEventoAdolescente();
 
-    actualizarGraficaAdolescente();
+    // Mostrar primer estado correctamente
+    generarRitmoAdolescente();
     setInterval(generarRitmoAdolescente, 1000);
 });

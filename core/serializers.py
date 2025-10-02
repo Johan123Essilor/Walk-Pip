@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usuario, TipoUsuario, ContactoEmergencia, Cita, SessionActividad, MetricaCaminata
+from .models import Usuario, TipoUsuario, ContactoEmergencia, Cita, SessionActividad, MetricaCaminata, MetricaCorazon
 
 class ContactoEmergenciaSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,6 +12,10 @@ class MetricaCaminataSerializer(serializers.ModelSerializer):
         model = MetricaCaminata
         fields = '__all__'
 
+class MetricaCorazonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MetricaCorazon
+        fields = '__all__'
 
 class ToggleSessionSerializer(serializers.Serializer):
     activo = serializers.BooleanField()

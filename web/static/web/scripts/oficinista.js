@@ -2,7 +2,7 @@
 
 let datosOficinista = [];
 let etiquetasOficinista = [];
-let ritmoActual = 75;
+let ritmoActualOficinista = 75;
 let rngMin = 60;
 let rngMax = 80;
 let oficinistaChart = null;
@@ -40,7 +40,7 @@ const eventosSenderismo = [
         efecto: () => {
             rngMin = 160;
             rngMax = 190;
-            ritmoActual = Math.floor(Math.random() * 31) + 170; // sube repentinamente
+            ritmoActualOficinista = Math.floor(Math.random() * 31) + 170; // sube repentinamente
             window.sustoActivo = 10; // 10 segundos de bajada gradual
         }
     }
@@ -65,6 +65,34 @@ function seleccionarEventoSenderismo() {
     eventoActual = eventosSenderismo[0].nombre;
 }
 
+function calcularPresionYOxigenacionOficinista(ritmo) {
+    let sistolica, diastolica, oxigeno;
+
+    // Presión arterial según el ritmo
+    if (ritmo < 80) { // reposo
+        sistolica = Math.floor(110 + Math.random() * 10); // 110–119
+        diastolica = Math.floor(70 + Math.random() * 5);  // 70–74
+    } else if (ritmo < 120) { // caminata ligera
+        sistolica = Math.floor(120 + Math.random() * 10); // 120–129
+        diastolica = Math.floor(75 + Math.random() * 10); // 75–84
+    } else if (ritmo < 160) { // actividad intensa
+        sistolica = Math.floor(130 + Math.random() * 15); // 130–144
+        diastolica = Math.floor(80 + Math.random() * 10); // 80–89
+    } else { // susto / estrés extremo
+        sistolica = Math.floor(150 + Math.random() * 30); // 150–180
+        diastolica = Math.floor(90 + Math.random() * 10); // 90–99
+    }
+
+    // Saturación de oxígeno
+    if (ritmo < 160) {
+        oxigeno = Math.floor(95 + Math.random() * 5); // 95–99%
+    } else {
+        oxigeno = Math.floor(92 + Math.random() * 3); // 92–94%
+    }
+
+    return { sistolica, diastolica, oxigeno };
+}
+
 function generarRitmoOficinista() {
     // Obtener hora actual
     const ahora = new Date();
@@ -84,7 +112,7 @@ function generarRitmoOficinista() {
     // Simulación de ritmo cardiaco
     if (window.sustoActivo && window.sustoActivo > 0) {
         // Si el evento susto está activo, baja gradualmente
-        ritmoActual -= Math.floor(Math.random() * 4) + 2; // baja entre 2 y 5 lpm por tick
+        ritmoActualOficinista -= Math.floor(Math.random() * 4) + 2; // baja entre 2 y 5 lpm por tick
         window.sustoActivo--;
         if (window.sustoActivo === 0) {
             // Al terminar, regresa a rango de senderismo
@@ -92,22 +120,30 @@ function generarRitmoOficinista() {
             rngMax = 140;
         }
     } else {
-        if (ritmoActual < rngMin) {
-            ritmoActual += 1;
-        } else if (ritmoActual > rngMax) {
-            ritmoActual -= 1;
+        if (ritmoActualOficinista < rngMin) {
+            ritmoActualOficinista += 1;
+        } else if (ritmoActualOficinista > rngMax) {
+            ritmoActualOficinista -= 1;
         } else {
             const cambio = Math.floor(Math.random() * 5) - 2;
-            let nuevo = ritmoActual + cambio;
+            let nuevo = ritmoActualOficinista + cambio;
             if (nuevo < rngMin) nuevo = rngMin;
             if (nuevo > rngMax) nuevo = rngMax;
-            ritmoActual = nuevo;
+            ritmoActualOficinista = nuevo;
         }
     }
 
+    // **Aquí llamamos a la función y obtenemos las variables**
+    const { sistolica, diastolica, oxigeno } = calcularPresionYOxigenacionOficinista(ritmoActualOficinista);
+
+ presion = `${sistolica}/${diastolica}`;
+     oxigenacion= oxigeno;
+
+    enviarMetrica(19, ritmoActualOficinista, sistolica, diastolica, oxigeno); // sessionId fijo en 20 para este ejemplo
+
     // Guardar datos para la gráfica
     etiquetasOficinista.push(ahora.toLocaleTimeString());
-    datosOficinista.push(ritmoActual);
+    datosOficinista.push(ritmoActualOficinista);
     if (etiquetasOficinista.length > mxPuntos) {
         etiquetasOficinista = etiquetasOficinista.slice(-mxPuntos);
         datosOficinista = datosOficinista.slice(-mxPuntos);
@@ -116,11 +152,37 @@ function generarRitmoOficinista() {
     // Mostrar evento y latidos en el HTML
     const eventoElem = document.getElementById('eventoActual');
     if (eventoElem) {
-        eventoElem.textContent = `Evento: ${eventoActual || '--'} | Latidos: ${ritmoActual} lpm`;
+        eventoElem.textContent = `Evento: ${eventoActual || '--'} | Latidos: ${ritmoActualOficinista} lpm`;
     }
 
     // Actualizar gráfica
     actualizarGraficaOficinista();
+}
+
+    function enviarMetrica(sessionId, ritmoActualOficinista, sistolica, diastolica, oxigeno) {
+    fetch("http://127.0.0.1:8000/api/metrica-corazon/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            session: 19,                      // el id de SessionActividad
+            ritmo_cardiaco: ritmoActualOficinista,                   // el ritmo actual
+            presion: parseFloat(`${sistolica}.${diastolica}`), // o guárdala como string si prefieres
+            oxigenacion: oxigeno,
+            fecha_hora: new Date().toISOString()     // ISO para DRF
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Error al enviar datos");
+        return res.json();
+    })
+    .then(data => {
+        console.log("Métrica guardada:", data);
+    })
+    .catch(err => {
+        console.error("Error al enviar métrica:", err);
+    });
 }
 
 function actualizarGraficaOficinista() {

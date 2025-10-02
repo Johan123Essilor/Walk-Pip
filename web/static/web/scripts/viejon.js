@@ -69,6 +69,35 @@ const ViejonSim = (() => {
         }
     }
 
+    function calcularPresionYOxigenacionViejon(ritmo) {
+    let sistolica, diastolica, oxigeno;
+
+    // --- Presión arterial basada en ritmo (ajustada a adultos mayores) ---
+    if (ritmo < 70) { // reposo/sueño
+        sistolica = Math.floor(120 + Math.random() * 10); // 120–129
+        diastolica = Math.floor(70 + Math.random() * 8);  // 70–77
+    } else if (ritmo < 100) { // actividad ligera
+        sistolica = Math.floor(130 + Math.random() * 15); // 130–144
+        diastolica = Math.floor(75 + Math.random() * 10); // 75–84
+    } else if (ritmo < 140) { // caminata corta / esfuerzo moderado
+        sistolica = Math.floor(140 + Math.random() * 20); // 140–159
+        diastolica = Math.floor(80 + Math.random() * 10); // 80–89
+    } else { // caminata larga o estrés
+        sistolica = Math.floor(160 + Math.random() * 20); // 160–179
+        diastolica = Math.floor(90 + Math.random() * 15); // 90–104
+    }
+
+    // --- Saturación de oxígeno (típicamente más baja en adultos mayores) ---
+    if (ritmo < 140) {
+        oxigeno = Math.floor(93 + Math.random() * 4); // 93–96%
+    } else {
+        oxigeno = Math.floor(90 + Math.random() * 3); // 90–92%
+    }
+
+    return { sistolica, diastolica, oxigeno };
+}
+
+
     function generarRitmoViejon() {
         const ahora = new Date();
 
@@ -103,6 +132,13 @@ const ViejonSim = (() => {
             }
         }
 
+        const { sistolica, diastolica, oxigeno } = calcularPresionYOxigenacionViejon(ritmoActual);
+          // Aquí ya puedes calcular la presión como string o número
+    presion = `${sistolica}/${diastolica}`;
+     oxigenacion= oxigeno;
+
+     enviarMetricaViejon(20, ritmoActual, sistolica, diastolica, oxigeno); // sessionId fijo en 20 para este ejemplo
+
         // Guardar datos
         const hora = ahora.toLocaleTimeString();
         etviejon.push(hora);
@@ -120,6 +156,32 @@ const ViejonSim = (() => {
 
         actualizarGraficaViejon();
     }
+
+    function enviarMetricaViejon(sessionId, ritmoActual, sistolica, diastolica, oxigeno) {
+    fetch("http://127.0.0.1:8000/api/metrica-corazon/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            session: 20,                      // el id de SessionActividad
+            ritmo_cardiaco: ritmoActual,                   // el ritmo actual
+            presion: parseFloat(`${sistolica}.${diastolica}`), // o guárdala como string si prefieres
+            oxigenacion: oxigeno,
+            fecha_hora: new Date().toISOString()     // ISO para DRF
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Error al enviar datos");
+        return res.json();
+    })
+    .then(data => {
+        console.log("Métrica guardada:", data);
+    })
+    .catch(err => {
+        console.error("Error al enviar métrica:", err);
+    });
+}
 
     function actualizarGraficaViejon() {
         const canvas = document.getElementById('viejon_grf');

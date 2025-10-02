@@ -78,7 +78,7 @@ function generarRitmoOficinista() {
     } else {
         rngMin = 60;
         rngMax = 80;
-        eventoActual = 'oficina';
+        eventoActual = 'reposo';
     }
 
     // Simulación de ritmo cardiaco

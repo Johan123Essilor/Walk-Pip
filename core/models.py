@@ -22,16 +22,13 @@ class ContactoEmergencia(models.Model):
         return self.nombre
 
 
-
-
 class Usuario(AbstractUser):
     telefono = models.CharField(max_length=20, blank=True, null=True)
     edad = models.IntegerField(blank=True, null=True)
     tipo_usuario = models.ForeignKey("TipoUsuario", on_delete=models.CASCADE, null=True)
     contacto = models.ForeignKey("ContactoEmergencia", on_delete=models.CASCADE, null=True)
-
+    session_activa = models.BooleanField(default= False)
     email = models.EmailField(unique=True)  # ✅ correo único
-
     USERNAME_FIELD = "email"   # ahora se loguea con email
     REQUIRED_FIELDS = ["username"]  # Django aún pedirá username si lo dejas
 
@@ -117,7 +114,7 @@ class SessionActividad(models.Model):
     fecha_hora_fin = models.DateTimeField(null=True, blank=True)  # ahora sí puede guardarse al terminar
     ubicacion_inicial = models.FloatField()
     ubicacion_final = models.FloatField()
-    ruta = models.ForeignKey(Ruta, on_delete=models.CASCADE)
+    ruta = models.ForeignKey(Ruta, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return f"{self.usuario} {self.ruta}"
@@ -131,7 +128,7 @@ class MetricaCaminata(models.Model):
     tiempo_actividad = models.CharField(max_length=50)
     velocidad_promedio = models.CharField(max_length=50)
     calorias_quemadas = models.CharField(max_length=50)
-    session = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    session = models.ForeignKey(SessionActividad, on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.km_recorridos} {self.calorias_quemadas}"
@@ -139,7 +136,7 @@ class MetricaCaminata(models.Model):
 
 class MetricaCorazon(models.Model):
     ID = models.AutoField(primary_key=True)
-    session = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    session = models.ForeignKey(SessionActividad, on_delete=models.CASCADE)
     ritmo_cardiaco = models.FloatField()
     presion = models.FloatField()
     oxigenacion = models.FloatField()

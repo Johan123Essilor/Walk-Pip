@@ -12,7 +12,7 @@ const ViejonSim = (() => {
 
     const eventosSenderismo = [
         {
-            nombre: 'Reposo/sueño',
+            nombre: 'Reposo',
             probabilidad: 0.4,
             efecto: () => {
                 rngMin = 65;
@@ -20,7 +20,7 @@ const ViejonSim = (() => {
             }
         },
         {
-            nombre: 'Actividad ligera',
+            nombre: 'Caminar',
             probabilidad: 0.2,
             efecto: () => {
                 rngMin = 80;
@@ -28,7 +28,7 @@ const ViejonSim = (() => {
             }
         },
         {
-            nombre: 'Caminata corta',
+            nombre: 'Correr',
             probabilidad: 0.3,
             efecto: () => {
                 rngMin = 100;
@@ -36,12 +36,12 @@ const ViejonSim = (() => {
             }
         },
         {
-            nombre: 'Caminata larga',
+            nombre: 'Susto',
             probabilidad: 0.1,
             efecto: () => {
-                rngMin = 105;
-                rngMax = 120;
-                ritmoActual = Math.floor(Math.random() * 31) + 105;
+                rngMin = 120;
+                rngMax = 150;
+                ritmoActual = Math.floor(Math.random() * 30) + 120;
                 window.sustoActivo = 10;
             }
         }

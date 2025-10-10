@@ -1,61 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Login</title>
-    <!-- Esto es necesario para obtener el CSRF token -->
+    <meta charset="UTF-8">
+    <title>Login | Walk-PIP</title>
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <style>
+        /* Estilo general */
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* Contenedor principal */
+        .login-container {
+            background: #fff;
+            width: 350px;
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        /* Logo */
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #5C4033;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Campos del formulario */
+        label {
+            display: block;
+            text-align: left;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #66803C;
+            border-radius: 10px;
+            outline: none;
+            margin-bottom: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus {
+            border-color: #5C4033;
+        }
+
+        /* Botón */
+        button {
+            background-color: #5C4033;
+            color: white;
+            font-weight: bold;
+            border: none;
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #7B5848;
+        }
+
+        /* Mensaje de respuesta */
+        #response {
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+
+        /* Animación sutil */
+        .login-container {
+            animation: fadeIn 0.8s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
 <body>
-    <h2>Iniciar sesión</h2>
-    <form id="loginForm">
-        <label>Correo:</label>
-        <input type="email" id="correo" required><br><br>
 
-        <label>Contraseña:</label>
-        <input type="password" id="contrasena" required><br><br>
+    <div class="login-container">
+        <div class="logo">Walk-PIP</div>
+        <h2 style="color:#66803C;">Iniciar sesión</h2>
+        <form id="loginForm">
+            <label for="correo">Correo</label>
+            <input type="email" id="correo" placeholder="correo@ejemplo.com" required>
 
-        <button type="submit">Entrar</button>
-    </form>
+            <label for="contrasena">Contraseña</label>
+            <input type="password" id="contrasena" placeholder="••••••••" required>
 
-    <p id="response"></p>
+            <button type="submit">Entrar</button>
+        </form>
 
-    <script>
-        const form = document.getElementById('loginForm');
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        <p id="response"></p>
+    </div>
 
-            const correo = document.getElementById('correo').value;
-            const contrasena = document.getElementById('contrasena').value;
+ <script> 
+ const form = document.getElementById('loginForm'); 
+ form.addEventListener('submit', async (e) => { e.preventDefault(); 
+    const correo = document.getElementById('correo').value; 
+    const contrasena = document.getElementById('contrasena').value
 
-            // Obtener token CSRF del meta
-            const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    // Obtener token CSRF del meta 
+    const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-            try {
-                const res = await fetch('/api/login/', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrftoken
-                    },
-                    credentials: 'include', // enviar cookies de sesión
-                    body: JSON.stringify({ 
-                        email: correo, 
-                        password: contrasena 
-                    })
-                });
-
-                const data = await res.json();
-                document.getElementById('response').innerText = JSON.stringify(data);
-
-                if (res.ok && data.usuario_id) {
-                    localStorage.setItem("usuario_id", data.usuario_id);
-                }
-
-            } catch (err) {
-                console.error(err);
-                document.getElementById('response').innerText = 'Error al iniciar sesión';
-            }
+    try { 
+        const res = await fetch('/api/login/', { 
+            method: 'POST', 
+            headers: { 
+                'Content-Type': 'application/json', 
+                'X-CSRFToken': csrftoken 
+            }, 
+            credentials: 'include', // enviar cookies de sesión 
+            body: JSON.stringify({ 
+                email: correo, 
+                password: contrasena 
+            }) 
         });
-    </script>
+        const data = await res.json(); 
+        //document.getElementById('response').innerText = JSON.stringify(data); 
+        if (res.ok && data.usuario_id) { 
+            localStorage.setItem("usuario_id", data.usuario_id); 
+            window.location.href =( "/web/index/");
+        }
+        } catch (err) { 
+            console.error(err); 
+            document.getElementById('response').innerText = 'Error al iniciar sesión'; 
+            } 
+            }); 
+            </script>
 </body>
 </html>

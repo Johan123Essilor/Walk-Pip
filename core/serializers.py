@@ -18,7 +18,7 @@ class MetricaCorazonSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ToggleSessionSerializer(serializers.Serializer):
-    activo = serializers.BooleanField()
+    activo = serializers.BooleanField(required=True)
 
 class SessionStatusSerializer(serializers.Serializer):
     session_activa = serializers.BooleanField()
@@ -40,6 +40,21 @@ class SessionStatusSerializer(serializers.Serializer):
 class UsuarioSerializer(serializers.ModelSerializer):
     tipo_usuario = serializers.PrimaryKeyRelatedField(queryset=TipoUsuario.objects.all(), required=False)
     contacto = ContactoEmergenciaSerializer(required=False)
+
+    # Definir campos explícitamente para que Swagger los muestre
+    username = serializers.CharField(required=True, max_length=150)
+    email = serializers.EmailField(required=True)
+    first_name = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    telefono = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    edad = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=150)
+    password = serializers.CharField(
+        write_only=True, 
+        required=True, 
+        style={'input_type': 'password'},
+        min_length=1
+    )
+    session_activa = serializers.BooleanField(required=False, default=False)
 
     class Meta:
         model = Usuario

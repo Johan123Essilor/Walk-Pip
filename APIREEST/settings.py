@@ -38,17 +38,21 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'core',
-    'web',
+    # 'core',
+    'users',
+    'trail',
+    'metrics',
+    'groups',
+    #'web',
     "corsheaders",
     "drf_yasg",
 ]
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ]
 }
-AUTH_USER_MODEL = "core.Usuario"
+AUTH_USER_MODEL = "users.Usuario"
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -84,10 +88,24 @@ WSGI_APPLICATION = 'APIREEST.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'walk_pip',  # Nombre de la base de datos
+        'USER': 'walk_pip_user',
+        'PASSWORD': 'PbcTARUb55v0GzLGeQP9rWSStlstV6IV',  # Coloca tu contraseña de Render
+        'HOST': 'dpg-d3puj0vdiees73c5a76g-a.oregon-postgres.render.com',
+        'PORT': '5432',
+        'OPTIONS': {
+            'sslmode': 'require',  # 🔐 Render exige SSL
+        },
     }
 }
 

@@ -104,11 +104,22 @@ DATABASES = {
         'HOST': 'dpg-d3puj0vdiees73c5a76g-a.oregon-postgres.render.com',
         'PORT': '5432',
         'OPTIONS': {
-            'sslmode': 'require',  # 🔐 Render exige SSL
+            'sslmode': 'require',  # Render exige SSL
         },
     }
 }
 
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'Introduce tu token JWT con el formato: Bearer <tu_token>'
+        }
+    },
+    'USE_SESSION_AUTH': False,  # Evita que muestre username/password
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

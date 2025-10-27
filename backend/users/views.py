@@ -1,14 +1,14 @@
 from django.shortcuts import render
 from rest_framework import generics, status
-from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework import viewsets, mixins
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import authenticate
-from .models import Usuario, Review
-from .serializers import UserRegisterSerializer, UserSerializer, LoginSerializer, ReviewSerializer
+from .models import Usuario, Review, Condicion, UsuarioCondicion, Salud
+from .serializers import UserRegisterSerializer, UserSerializer, LoginSerializer, ReviewSerializer, SaludSerializer, CondicionSerializer, UsuarioCondicionSerializer
 
 
 class RegisterView(generics.CreateAPIView):
@@ -44,52 +44,135 @@ class LoginView(generics.CreateAPIView):
         return Response({"detail": "Credenciales inválidas"}, status=status.HTTP_401_UNAUTHORIZED)
     
 class ReviewViewSet(viewsets.ModelViewSet):
-    queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
+    
+    # Permitir solo GET, POST, PUT, PATCH, DELETE
+    http_method_names = ['get', 'post', 'put', 'patch']
 
-  # GET /reviews/usuario/<usuario_id>/
-    @action(detail=False, methods=['get'], url_path='usuario/(?P<usuario_id>[^/.]+)')
-    def reviews_por_usuario(self, request, usuario_id=None):
-        """
-        Devuelve todas las reseñas de un usuario específico.
-        """
-        # Verificar que el usuario solo pueda ver sus propias reseñas
-        if int(usuario_id) != request.user.id:
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Review.objects.none()
+        return Review.objects.all()
+
+    def perform_create(self, serializer):
+        # Asignar automáticamente el usuario logueado
+        serializer.save(usuario=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        """Solo permitir actualizar reseñas propias"""
+        instance = self.get_object()
+        if instance.usuario != request.user:
             return Response(
-                {'error': 'No tienes permiso para ver las reseñas de otro usuario.'},
+                {'error': 'No puedes actualizar reseñas de otros usuarios'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
-        reviews = Review.objects.filter(usuario_id=usuario_id)
+        return super().update(request, *args, **kwargs)
+
+    # Solo este endpoint personalizado que agrega valor
+    @action(detail=False, methods=['get'])
+    def mis_reviews(self, request):
+        """
+        Endpoint específico para obtener solo las reseñas del usuario logueado
+        """
+        reviews = Review.objects.filter(usuario=request.user)
         serializer = self.get_serializer(reviews, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data)
 
-    # PUT /reviews/usuario/actualizar/<usuario_id>/
-    @action(detail=False, methods=['put'], url_path='usuario/actualizar/(?P<usuario_id>[^/.]+)')
-    def actualizar_por_usuario(self, request, usuario_id=None):
+class PerfilView(mixins.RetrieveModelMixin,
+                 mixins.UpdateModelMixin,
+                 mixins.ListModelMixin,
+                 viewsets.GenericViewSet):
+    """
+    ViewSet para gestionar el perfil del usuario autenticado.
+    """
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+    
+    # Agrega esto para Swagger
+    queryset = Usuario.objects.all()
+
+    def get_object(self):
+        # Siempre retorna el usuario autenticado, ignora el pk
+        return self.request.user
+
+    def list(self, request, *args, **kwargs):
+        # Redirige a retrieve para obtener el perfil
+        return self.retrieve(request, *args, **kwargs)
+
+# --- VIEWSET PARA CONDICIONES (CATÁLOGO) ---
+class CondicionViewSet(mixins.ListModelMixin, 
+                       mixins.RetrieveModelMixin,
+                       mixins.CreateModelMixin,
+                       viewsets.GenericViewSet):
+    """
+    Catálogo de condiciones médicas disponibles.
+    GET: Lista todas las condiciones (solo autenticado)
+    POST: Crear nueva condición (solo autenticado)
+    """
+    queryset = Condicion.objects.all()
+    serializer_class = CondicionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Condicion.objects.none()
+        return Condicion.objects.all()
+    
+    def perform_create(self, serializer):
+        serializer.save()
+
+# --- VIEWSET PARA USUARIO-CONDICIÓN ---
+class UsuarioCondicionViewSet(mixins.CreateModelMixin,
+                              viewsets.GenericViewSet):
+    """
+    Gestiona las condiciones asignadas al usuario autenticado.
+    SOLO POST: Agregar condición al usuario
+    """
+    serializer_class = UsuarioCondicionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Como no permitimos GET, este método no se usará mucho
+        if getattr(self, 'swagger_fake_view', False) or not self.request.user.is_authenticated:
+            return UsuarioCondicion.objects.none()
+        return UsuarioCondicion.objects.filter(usuario=self.request.user)
+
+    def perform_create(self, serializer):
+        # Asocia automáticamente al usuario actual
+        serializer.save(usuario=self.request.user)
+
+# --- VIEWSET PARA SALUD ---
+class SaludViewSet(viewsets.ModelViewSet):
+    """
+    Permite que el usuario registre y consulte sus datos de salud.
+    """
+    serializer_class = SaludSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False) or not self.request.user.is_authenticated:
+            return Salud.objects.none()
+
+        #  Solo el registro del usuario autenticado
+        return Salud.objects.filter(usuario=self.request.user)
+
+    def perform_create(self, serializer):
+        #  Asocia el registro al usuario autenticado
+        serializer.save(usuario=self.request.user)
+
+    # GET /salud/mis_datos/
+    @action(detail=False, methods=['get'])
+    def mis_datos(self, request):
         """
-        Actualiza la reseña de un usuario por su ID de usuario.
-        Si el usuario tiene varias reseñas, se actualizará la más reciente.
+        Retorna los datos de salud del usuario autenticado.
         """
-        # Verificar que el usuario solo pueda actualizar sus propias reseñas
-        if int(usuario_id) != request.user.id:
+        salud = Salud.objects.filter(usuario=request.user).first()
+        if not salud:
             return Response(
-                {'error': 'No tienes permiso para actualizar las reseñas de otro usuario.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        try:
-            # Buscar la reseña más reciente del usuario
-            review = Review.objects.filter(usuario_id=usuario_id).latest('fecha')
-        except Review.DoesNotExist:
-            return Response(
-                {'error': 'No se encontró ninguna reseña para este usuario.'},
+                {"detalle": "No hay datos de salud registrados."},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = self.get_serializer(review, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
+        serializer = self.get_serializer(salud)
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -33,7 +33,7 @@ class MetricaCorazonSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class SesionActividadSerializer(serializers.ModelSerializer):
+class SesionActividadReadSerializer(serializers.ModelSerializer):
     metricas_caminata = MetricaCaminataSerializer(many=True, read_only=True, source='metricacaminata_set')
     metricas_corazon = MetricaCorazonSerializer(many=True, read_only=True, source='metricacorazon_set')
 
@@ -45,3 +45,16 @@ class SesionActividadSerializer(serializers.ModelSerializer):
             'ubicacion_inicial', 'ubicacion_final',
             'metricas_caminata', 'metricas_corazon'
         ]
+
+class SesionActividadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SesionActividad
+        fields = '__all__'
+        extra_kwargs = {
+            "fecha_hora_fin": {"required": False, "allow_null": True},
+            "ubicacion_inicial": {"required": False, "allow_null": True},
+            "ubicacion_final": {"required": False, "allow_null": True},
+            "ruta": {"required": False, "allow_null": True},
+            "cita": {"required": False, "allow_null": True},
+        }
+

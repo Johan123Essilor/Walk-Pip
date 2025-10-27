@@ -8,7 +8,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('trail', '0003_alter_historialusuarioruta_table_alter_mapa_table_and_more'),
         ('users', '0001_initial'),
     ]
 

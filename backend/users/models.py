@@ -35,7 +35,7 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     edad = models.IntegerField(null=True, blank=True)
     session_activa = models.BooleanField(default= False)
     fecha_registro = models.DateField(auto_now_add=True)
-    tipo_usuario = models.ForeignKey(TipoUsuario, on_delete=models.SET_NULL, null=True)
+    tipo_usuario = models.ForeignKey(TipoUsuario, on_delete=models.CASCADE)
     
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

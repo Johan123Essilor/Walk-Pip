@@ -9,7 +9,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('metrics', '0003_initial'),
-        ('trail', '0003_alter_historialusuarioruta_table_alter_mapa_table_and_more'),
     ]
 
     operations = [

@@ -105,7 +105,7 @@ class SesionActividadViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-# ✅ Vistas para las métricas
+# Vistas para las métricas
 class MetricaCaminataViewSet(viewsets.ModelViewSet):
     queryset = MetricaCaminata.objects.all()
     serializer_class = MetricaCaminataSerializer

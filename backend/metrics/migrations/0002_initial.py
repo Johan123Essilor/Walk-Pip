@@ -10,7 +10,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('metrics', '0001_initial'),
-        ('trail', '0001_initial'),
     ]
 
     operations = [

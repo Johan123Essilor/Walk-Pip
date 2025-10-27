@@ -2,23 +2,23 @@ from django.db import models
 from django.conf import settings
 from groups.models import Grupo
 
-class Ruta(models.Model):
-    nombre_ruta = models.CharField(max_length=150)
-    descripcion = models.TextField(null=True, blank=True)
-    nivel_experiencia = models.CharField(max_length=50)
-    mapa_url = models.TextField(null=True, blank=True)
-    creador = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
-
-    class Meta:
-        db_table = 'ruta'
-
 class Mapa(models.Model):
-    ruta = models.ForeignKey(Ruta, on_delete=models.CASCADE)
-    archivo_mapa = models.TextField()
-    disponible_offline = models.BooleanField(default=False)
+    nombre = models.CharField(max_length=50)
+    archivo = models.FileField(upload_to='../archivos/', null=True, blank=True)
 
     class Meta:
         db_table = 'mapa'
+
+class Ruta(models.Model):
+    nombre = models.CharField(max_length=50)
+    descripcion = models.CharField(max_length=200)
+    nivel_experiencia = models.CharField(max_length=100)
+    lat = models.FloatField()
+    lon = models.FloatField()
+    mapa = models.ForeignKey(Mapa, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'ruta'
 
 class HistorialUsuarioRuta(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

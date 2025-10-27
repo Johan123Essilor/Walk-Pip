@@ -30,7 +30,7 @@ class MetricaCaminata(models.Model):
         db_table = 'metrica_caminata'
 
     def __str__(self):
-        return f"{self.session.usuario} - {self.km_recorridos} km"
+        return f"{self.sesion.usuario} - {self.km_recorridos} km"
 
 class MetricaCorazon(models.Model):
     sesion = models.ForeignKey(SesionActividad, on_delete=models.CASCADE)
@@ -44,5 +44,5 @@ class MetricaCorazon(models.Model):
         db_table = 'metrica_corazon'
 
     def __str__(self):
-        return f"{self.session.usuario} - {self.ritmo_cardiaco} bpm"
+        return f"{self.sesion.usuario} - {self.ritmo_cardiaco} bpm"
 

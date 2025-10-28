@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usuario, TipoUsuario, Review, TipoAlerta, Alerta, UsuarioAlerta, Salud, Condicion, UsuarioCondicion
+from .models import Usuario, TipoUsuario, Review, TipoAlerta, Alerta, UsuarioAlerta, Salud, Condicion, UsuarioCondicion, ContactoEmergencia, HorarioRetorno
 
 class TipoUsuarioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -47,6 +47,28 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         # Asignar automáticamente el usuario logueado
+        validated_data['usuario'] = self.context['request'].user
+        return super().create(validated_data)
+    
+class ContactoEmergenciaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactoEmergencia
+        fields = "__all__"
+        read_only_fields = ['usuario']  # El usuario se asigna automáticamente
+
+    def create(self, validated_data):
+        # Asegurar que el usuario se asigne desde el contexto
+        validated_data['usuario'] = self.context['request'].user
+        return super().create(validated_data)
+
+class HorarioRetornoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HorarioRetorno
+        fields = "__all__"
+        read_only_fields = ['usuario']  # El usuario se asigna automáticamente
+
+    def create(self, validated_data):
+        # Asegurar que el usuario se asigne desde el contexto
         validated_data['usuario'] = self.context['request'].user
         return super().create(validated_data)
 

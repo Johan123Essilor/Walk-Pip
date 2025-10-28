@@ -2,61 +2,46 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Cita, HistorialUsuarioRuta, ContactoEmergencia, HorarioRetorno
-from .serializers import CitaSerializer, HistorialUsuarioRutaSerializer, ContactoEmergenciaSerializer, HorarioRetornoSerializer
+from .models import Cita, HistorialUsuarioRuta
+from .serializers import CitaSerializer, HistorialUsuarioRutaSerializer
 
 class CitaViewSet(viewsets.ModelViewSet):
-    queryset = Cita.objects.all()
     serializer_class = CitaSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'put', 'patch']
 
-    # GET /agendar/usuario/<id_usuario>/
-    @action(detail=False, methods=['get'], url_path='usuario/(?P<usuario_id>[^/.]+)')
-    def citas_por_usuario(self, request, usuario_id=None):
+    def get_queryset(self):
         """
-        Devuelve todas las citas de un usuario específico.
+        Solo retorna las citas del usuario autenticado
         """
-        citas = Cita.objects.filter(usuario_id=usuario_id)
-        serializer = self.get_serializer(citas, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        if getattr(self, 'swagger_fake_view', False):
+            return Cita.objects.none()
+        return Cita.objects.filter(usuario=self.request.user)
 
-     # PUT /agendar/actualizar/<id_usuario>/
-    @action(detail=False, methods=['put'], url_path='usuario/actualizar/(?P<usuario_id>[^/.]+)')
-    def actualizar_por_usuario(self, request, usuario_id=None):
+    def perform_create(self, serializer):
         """
-        Actualiza la cita de un usuario por su ID de usuario.
-        Si el usuario tiene varias citas, se actualizará la más reciente.
+        Asigna automáticamente el usuario autenticado al crear una cita
         """
-        try:
-            cita = Cita.objects.filter(usuario_id=usuario_id).latest('creado_en')
-        except Cita.DoesNotExist:
-            return Response({'error': 'No se encontró ninguna cita para este usuario.'},
-                            status=status.HTTP_404_NOT_FOUND)
+        serializer.save(usuario=self.request.user)
 
-        serializer = self.get_serializer(cita, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+    def update(self, request, *args, **kwargs):
+        """
+        Solo permite actualizar citas del usuario autenticado
+        """
+        instance = self.get_object()
+        if instance.usuario != request.user:
+            return Response(
+                {'error': 'No puedes actualizar citas de otros usuarios'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    # Eliminar los endpoints personalizados duplicados ya que 
+    # la funcionalidad está cubierta por los métodos base
 
 class HistorialUsuarioRutaViewSet(viewsets.ModelViewSet):  
     queryset = HistorialUsuarioRuta.objects.all()
     serializer_class = HistorialUsuarioRutaSerializer
-    permission_classes = [IsAuthenticated]
-
-    def perform_create(self, serializer):
-        serializer.save()
-
-class ContactoEmergenciaViewSet(viewsets.ModelViewSet):
-    queryset = ContactoEmergencia.objects.all()
-    serializer_class = ContactoEmergenciaSerializer
-    permission_classes = [IsAuthenticated]
-
-    def perform_create(self, serializer):
-        serializer.save()
-
-class HorarioRetornoViewSet(viewsets.ModelViewSet):
-    queryset = HorarioRetorno.objects.all()
-    serializer_class = HorarioRetornoSerializer
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):

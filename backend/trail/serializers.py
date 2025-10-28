@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Ruta, Mapa, HistorialUsuarioRuta, Cita, ContactoEmergencia, HorarioRetorno
+from .models import Ruta, Mapa, HistorialUsuarioRuta, Cita
 
 
 class RutaSerializer(serializers.ModelSerializer):
@@ -21,19 +21,18 @@ class HistorialUsuarioRutaSerializer(serializers.ModelSerializer):
 
 
 class CitaSerializer(serializers.ModelSerializer):
-    usuario = serializers.ReadOnlyField(source='usuario.id')
-
+    usuario_nombre = serializers.CharField(source='usuario.nombre', read_only=True)
+    ruta_nombre = serializers.CharField(source='ruta.nombre', read_only=True)
+    
     class Meta:
         model = Cita
-        fields = "__all__"
+        fields = [
+            'id', 'usuario', 'usuario_nombre', 'ruta', 'ruta_nombre', 
+            'compania', 'fecha_visita', 'clima', 'recomendaciones', 'creado_en'
+        ]
+        read_only_fields = ['usuario', 'creado_en']  # usuario se asigna automáticamente
 
-class ContactoEmergenciaSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ContactoEmergencia
-        fields = "__all__"
-
-
-class HorarioRetornoSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = HorarioRetorno
-        fields = "__all__"
+    def create(self, validated_data):
+        # Asegurar que el usuario se asigne desde el contexto
+        validated_data['usuario'] = self.context['request'].user
+        return super().create(validated_data)

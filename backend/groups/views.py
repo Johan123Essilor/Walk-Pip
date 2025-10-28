@@ -1,3 +1,302 @@
-from django.shortcuts import render
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+from .models import Grupo, UsuarioGrupo
+from .serializers import (
+    GrupoSerializer, UsuarioGrupoSerializer, 
+    InvitarUsuarioSerializer, ProgramarActividadSerializer, 
+    InvitarMultiplesUsuariosSerializer
+)
+from users.models import Usuario
 
-# Create your views here.
+
+class GrupoViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet principal para la gestión de grupos e interacciones entre usuarios.
+    """
+    serializer_class = GrupoSerializer
+    permission_classes = [IsAuthenticated]
+
+    # --------------------------
+    # SERIALIZADOR DINÁMICO
+    # --------------------------
+    def get_serializer_class(self):
+        """
+        Permite usar un serializer distinto según la acción.
+        """
+        if self.action in ['invite_multiple']:
+            return InvitarMultiplesUsuariosSerializer
+        elif self.action in ['members', 'pending_invitations', 'group_pending_invitations']:
+            return UsuarioGrupoSerializer
+        elif self.action in ['schedule_activity']:
+            return ProgramarActividadSerializer
+        return GrupoSerializer
+
+    # --------------------------
+    # QUERYSET BASE
+    # --------------------------
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Grupo.objects.none()
+        # Usuario puede ver grupos donde es miembro o creador
+        return Grupo.objects.filter(
+            Q(creador=self.request.user) |
+            Q(usuariogrupo__usuario=self.request.user)
+        ).distinct()
+
+    # --------------------------
+    # CREACIÓN DE GRUPO
+    # --------------------------
+    def perform_create(self, serializer):
+        grupo = serializer.save(creador=self.request.user)
+        # El creador se agrega automáticamente como administrador
+        UsuarioGrupo.objects.create(
+            usuario=self.request.user,
+            grupo=grupo,
+            rol='Creador',
+            aceptado=True
+        )
+
+    # --------------------------
+    # ACTUALIZAR / ELIMINAR
+    # --------------------------
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.creador != request.user:
+            return Response(
+                {'error': 'Solo el creador del grupo puede actualizarlo'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.creador != request.user:
+            return Response(
+                {'error': 'Solo el creador del grupo puede eliminarlo'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
+
+    # --------------------------
+    # ENDPOINTS PERSONALIZADOS
+    # --------------------------
+
+    @action(detail=False, methods=['get'])
+    def all(self, request):
+        """Listar grupos del usuario"""
+        grupos = self.get_queryset()
+        serializer = self.get_serializer(grupos, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='invite-multiple')
+    def invite_multiple(self, request, pk=None):
+        """
+        Invitar múltiples usuarios al grupo.
+        Solo requiere `usuarios_ids` y `rol`.
+        """
+        grupo = self.get_object()
+
+        # Solo administradores o creadores pueden invitar
+        if not UsuarioGrupo.objects.filter(
+            usuario=request.user, grupo=grupo, rol__in=['Administrador', 'Creador']
+        ).exists():
+            return Response(
+                {'error': 'Solo los administradores pueden invitar usuarios'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        usuarios_ids = serializer.validated_data['usuarios_ids']
+        rol = serializer.validated_data['rol']
+
+        resultados = {
+            'invitados_exitosos': [],
+            'ya_eran_miembros': [],
+            'usuarios_no_encontrados': []
+        }
+
+        for usuario_id in usuarios_ids:
+            try:
+                usuario = Usuario.objects.get(id=usuario_id)
+
+                if UsuarioGrupo.objects.filter(usuario=usuario, grupo=grupo).exists():
+                    resultados['ya_eran_miembros'].append(usuario_id)
+                    continue
+
+                UsuarioGrupo.objects.create(
+                    usuario=usuario,
+                    grupo=grupo,
+                    rol=rol,
+                    aceptado=False
+                )
+
+                resultados['invitados_exitosos'].append({
+                    'id': usuario.id,
+                    'nombre': usuario.nombre,
+                    'correo': usuario.correo
+                })
+
+            except Usuario.DoesNotExist:
+                resultados['usuarios_no_encontrados'].append(usuario_id)
+
+        return Response(resultados)
+
+    @action(detail=True, methods=['get'])
+    def members(self, request, pk=None):
+        """Obtener miembros aceptados de un grupo"""
+        grupo = self.get_object()
+        miembros = UsuarioGrupo.objects.filter(grupo=grupo, aceptado=True)
+        serializer = UsuarioGrupoSerializer(miembros, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def schedule_activity(self, request, pk=None):
+        """Programar una actividad grupal"""
+        grupo = self.get_object()
+
+        if not UsuarioGrupo.objects.filter(
+            usuario=request.user, grupo=grupo, aceptado=True
+        ).exists():
+            return Response(
+                {'error': 'Debes ser miembro del grupo para programar actividades'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        return Response({
+            'mensaje': 'Actividad programada exitosamente',
+            'grupo': grupo.nombre,
+            'datos': serializer.validated_data
+        })
+
+    @action(detail=True, methods=['post'])
+    def join(self, request, pk=None):
+        """Unirse a un grupo público"""
+        grupo = self.get_object()
+        if UsuarioGrupo.objects.filter(usuario=request.user, grupo=grupo).exists():
+            return Response({'error': 'Ya eres miembro de este grupo'}, status=400)
+
+        UsuarioGrupo.objects.create(
+            usuario=request.user, grupo=grupo, rol='Miembro', aceptado=True
+        )
+        return Response({'mensaje': 'Te has unido al grupo exitosamente'})
+
+    @action(detail=True, methods=['post'])
+    def leave(self, request, pk=None):
+        """Abandonar grupo"""
+        grupo = self.get_object()
+        try:
+            usuario_grupo = UsuarioGrupo.objects.get(usuario=request.user, grupo=grupo)
+            if grupo.creador == request.user:
+                return Response(
+                    {'error': 'El creador no puede abandonar el grupo.'},
+                    status=400
+                )
+            usuario_grupo.delete()
+            return Response({'mensaje': 'Has abandonado el grupo'})
+        except UsuarioGrupo.DoesNotExist:
+            return Response({'error': 'No eres miembro de este grupo'}, status=400)
+
+    @action(detail=True, methods=['post'])
+    def accept_invitation(self, request, pk=None):
+        """Aceptar invitación a grupo"""
+        grupo = self.get_object()
+        try:
+            usuario_grupo = UsuarioGrupo.objects.get(
+                usuario=request.user, grupo=grupo, aceptado=False
+            )
+            usuario_grupo.aceptado = True
+            usuario_grupo.save()
+            return Response({'mensaje': 'Invitación aceptada exitosamente'})
+        except UsuarioGrupo.DoesNotExist:
+            return Response({'error': 'No tienes invitación pendiente'}, status=404)
+
+    @action(detail=False, methods=['get'])
+    def pending_invitations(self, request):
+        """Invitaciones pendientes del usuario"""
+        invitaciones = UsuarioGrupo.objects.filter(usuario=request.user, aceptado=False)
+        serializer = UsuarioGrupoSerializer(invitaciones, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def group_pending_invitations(self, request, pk=None):
+        """Invitaciones pendientes de un grupo (solo administradores)"""
+        grupo = self.get_object()
+        if not UsuarioGrupo.objects.filter(
+            usuario=request.user, grupo=grupo, rol__in=['Administrador', 'Creador']
+        ).exists():
+            return Response(
+                {'error': 'No tienes permisos para ver las invitaciones'},
+                status=403
+            )
+
+        invitaciones = UsuarioGrupo.objects.filter(grupo=grupo, aceptado=False)
+        serializer = UsuarioGrupoSerializer(invitaciones, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def search_users(self, request):
+        """Buscar usuarios (para invitar o mostrar)"""
+        q = request.GET.get('q', '')
+        exclude_group = request.GET.get('exclude_group')
+
+        if not q:
+            return Response({'error': 'Parámetro q requerido'}, status=400)
+
+        usuarios = Usuario.objects.filter(
+            Q(nombre__icontains=q) | Q(correo__icontains=q)
+        ).exclude(id=request.user.id)
+
+        if exclude_group:
+            miembros_ids = UsuarioGrupo.objects.filter(
+                grupo_id=exclude_group
+            ).values_list('usuario_id', flat=True)
+            usuarios = usuarios.exclude(id__in=miembros_ids)
+
+        data = [
+            {
+                'id': u.id,
+                'nombre': u.nombre,
+                'correo': u.correo,
+                'tipo_usuario': u.tipo_usuario.nombre if u.tipo_usuario else None
+            }
+            for u in usuarios[:10]
+        ]
+        return Response(data)
+
+    @action(detail=True, methods=['post'])
+    def transfer_ownership(self, request, pk=None):
+        """Transferir propiedad del grupo"""
+        grupo = self.get_object()
+        if grupo.creador != request.user:
+            return Response({'error': 'Solo el creador puede transferir'}, status=403)
+
+        nuevo_id = request.data.get('nuevo_creador_id')
+        if not nuevo_id:
+            return Response({'error': 'nuevo_creador_id es requerido'}, status=400)
+
+        try:
+            nuevo_creador = Usuario.objects.get(id=nuevo_id)
+            rel = UsuarioGrupo.objects.get(usuario=nuevo_creador, grupo=grupo)
+
+            grupo.creador = nuevo_creador
+            grupo.save()
+
+            rel.rol = 'Creador'
+            rel.save()
+
+            antiguo = UsuarioGrupo.objects.get(usuario=request.user, grupo=grupo)
+            antiguo.rol = 'Administrador'
+            antiguo.save()
+
+            return Response({'mensaje': 'Propiedad transferida exitosamente'})
+        except Usuario.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=404)
+        except UsuarioGrupo.DoesNotExist:
+            return Response({'error': 'El usuario no pertenece al grupo'}, status=400)

@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework import viewsets, mixins
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import authenticate
-from .models import Usuario, Review, Condicion, UsuarioCondicion, Salud
-from .serializers import UserRegisterSerializer, UserSerializer, LoginSerializer, ReviewSerializer, SaludSerializer, CondicionSerializer, UsuarioCondicionSerializer
+from .models import Usuario, Review, Condicion, UsuarioCondicion, Salud, ContactoEmergencia, HorarioRetorno
+from .serializers import UserRegisterSerializer, UserSerializer, LoginSerializer, ReviewSerializer, SaludSerializer, CondicionSerializer, UsuarioCondicionSerializer, ContactoEmergenciaSerializer, HorarioRetornoSerializer
 
 
 class RegisterView(generics.CreateAPIView):
@@ -176,3 +176,57 @@ class SaludViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(salud)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class ContactoEmergenciaViewSet(viewsets.ModelViewSet):
+    serializer_class = ContactoEmergenciaSerializer
+    permission_classes = [IsAuthenticated]
+    
+    # Solo permitir estos métodos
+    http_method_names = ['get', 'post', 'put', 'patch']
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return ContactoEmergencia.objects.none()
+        return ContactoEmergencia.objects.filter(usuario=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(usuario=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.usuario != request.user:
+            return Response(
+                {'error': 'No puedes actualizar contactos de otros usuarios'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+class HorarioRetornoViewSet(viewsets.ModelViewSet):
+    serializer_class = HorarioRetornoSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Solo retorna los horarios de retorno del usuario autenticado
+        """
+        if getattr(self, 'swagger_fake_view', False):
+            return HorarioRetorno.objects.none()
+        return HorarioRetorno.objects.filter(usuario=self.request.user)
+
+    def perform_create(self, serializer):
+        """
+        Asigna automáticamente el usuario autenticado al crear un horario
+        """
+        serializer.save(usuario=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Solo permite actualizar horarios del usuario autenticado
+        """
+        instance = self.get_object()
+        if instance.usuario != request.user:
+            return Response(
+                {'error': 'No puedes actualizar horarios de otros usuarios'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)

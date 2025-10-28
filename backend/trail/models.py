@@ -47,21 +47,4 @@ class Cita(models.Model):
     def __str__(self):
         return f"{self.usuario} - {self.ruta}"
     
-class ContactoEmergencia(models.Model):
-    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
-    nombre_contacto = models.CharField(max_length=100)
-    correo = models.EmailField()
-    parentesco = models.CharField(max_length=50)
-
-    class Meta:
-        db_table = 'contacto_emergencia'
-
-class HorarioRetorno(models.Model):
-    cita = models.ForeignKey(Cita, on_delete=models.CASCADE, related_name='horarios')
-    contacto = models.ForeignKey(ContactoEmergencia, on_delete=models.SET_NULL, null=True)
-    hora_retorno = models.TimeField()
-    enviado = models.BooleanField(default=False)
-
-    class Meta:
-        db_table = 'horario_retorno'
 

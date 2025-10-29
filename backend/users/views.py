@@ -7,6 +7,8 @@ from rest_framework.response import Response
 from rest_framework import viewsets, mixins
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import authenticate
+from trail.models import HistorialUsuarioRuta, Cita
+from datetime import datetime, date
 from .models import Usuario, Review, Condicion, UsuarioCondicion, Salud, ContactoEmergencia, HorarioRetorno
 from .serializers import UserRegisterSerializer, UserSerializer, LoginSerializer, ReviewSerializer, SaludSerializer, CondicionSerializer, UsuarioCondicionSerializer, ContactoEmergenciaSerializer, HorarioRetornoSerializer
 
@@ -107,8 +109,8 @@ class CondicionViewSet(mixins.ListModelMixin,
                        viewsets.GenericViewSet):
     """
     Catálogo de condiciones médicas disponibles.
-    GET: Lista todas las condiciones (solo autenticado)
-    POST: Crear nueva condición (solo autenticado)
+    GET: Lista todas las condiciones
+    POST: Crear nueva condición (asigna automáticamente al usuario autenticado)
     """
     queryset = Condicion.objects.all()
     serializer_class = CondicionSerializer
@@ -118,29 +120,12 @@ class CondicionViewSet(mixins.ListModelMixin,
         if getattr(self, 'swagger_fake_view', False):
             return Condicion.objects.none()
         return Condicion.objects.all()
-    
-    def perform_create(self, serializer):
-        serializer.save()
-
-# --- VIEWSET PARA USUARIO-CONDICIÓN ---
-class UsuarioCondicionViewSet(mixins.CreateModelMixin,
-                              viewsets.GenericViewSet):
-    """
-    Gestiona las condiciones asignadas al usuario autenticado.
-    SOLO POST: Agregar condición al usuario
-    """
-    serializer_class = UsuarioCondicionSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Como no permitimos GET, este método no se usará mucho
-        if getattr(self, 'swagger_fake_view', False) or not self.request.user.is_authenticated:
-            return UsuarioCondicion.objects.none()
-        return UsuarioCondicion.objects.filter(usuario=self.request.user)
 
     def perform_create(self, serializer):
-        # Asocia automáticamente al usuario actual
-        serializer.save(usuario=self.request.user)
+        condicion = serializer.save()
+        # 🔹 Crear automáticamente la relación con el usuario autenticado
+        UsuarioCondicion.objects.create(usuario=self.request.user, condicion=condicion)
+
 
 # --- VIEWSET PARA SALUD ---
 class SaludViewSet(viewsets.ModelViewSet):
@@ -207,24 +192,52 @@ class HorarioRetornoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Solo retorna los horarios de retorno del usuario autenticado
+        Retorna los horarios del usuario autenticado,
+        filtrando a través de las citas que le pertenecen.
         """
         if getattr(self, 'swagger_fake_view', False):
             return HorarioRetorno.objects.none()
-        return HorarioRetorno.objects.filter(usuario=self.request.user)
+        return HorarioRetorno.objects.filter(cita__usuario=self.request.user)
 
     def perform_create(self, serializer):
         """
-        Asigna automáticamente el usuario autenticado al crear un horario
+        Crea el horario y genera el historial automáticamente.
         """
-        serializer.save(usuario=self.request.user)
+        horario = serializer.save()
+
+        # Calcular duración estimada
+        duracion_estimada = None
+        if horario.hora_inicio and horario.hora_retorno:
+            inicio = datetime.combine(date.today(), horario.hora_inicio)
+            fin = datetime.combine(date.today(), horario.hora_retorno)
+            duracion_estimada = fin - inicio
+
+       # Buscar si hay historiales previos de esa ruta y usuario
+            historial = HistorialUsuarioRuta.objects.filter(
+                usuario=horario.cita.usuario,
+                ruta=horario.cita.ruta
+            ).last()  # el más reciente, por ejemplo
+
+            # Si no hay historial previo, lo creas
+            if not historial:
+                historial = HistorialUsuarioRuta.objects.create(
+                    usuario=horario.cita.usuario,
+                    ruta=horario.cita.ruta,
+                    tiempo_duracion=duracion_estimada,
+                    resultado="Pendiente",
+                    satisfaccion="Por evaluar"
+                )
+            else:
+                historial.tiempo_duracion = duracion_estimada
+                historial.save()
+
 
     def update(self, request, *args, **kwargs):
         """
         Solo permite actualizar horarios del usuario autenticado
         """
         instance = self.get_object()
-        if instance.usuario != request.user:
+        if instance.cita.usuario != request.user:
             return Response(
                 {'error': 'No puedes actualizar horarios de otros usuarios'},
                 status=status.HTTP_403_FORBIDDEN

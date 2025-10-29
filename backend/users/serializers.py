@@ -64,13 +64,8 @@ class ContactoEmergenciaSerializer(serializers.ModelSerializer):
 class HorarioRetornoSerializer(serializers.ModelSerializer):
     class Meta:
         model = HorarioRetorno
-        fields = "__all__"
-        read_only_fields = ['usuario']  # El usuario se asigna automáticamente
-
-    def create(self, validated_data):
-        # Asegurar que el usuario se asigne desde el contexto
-        validated_data['usuario'] = self.context['request'].user
-        return super().create(validated_data)
+        fields = ['id', 'cita', 'contacto', 'hora_inicio', 'hora_retorno', 'enviado']
+        read_only_fields = ['id', 'enviado']
 
 class TipoAlertaSerializer(serializers.ModelSerializer):
     class Meta:

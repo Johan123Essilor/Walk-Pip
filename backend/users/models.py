@@ -97,11 +97,15 @@ class ContactoEmergencia(models.Model):
 class HorarioRetorno(models.Model):
     cita = models.ForeignKey(Cita, on_delete=models.CASCADE, related_name='horarios')
     contacto = models.ForeignKey(ContactoEmergencia, on_delete=models.SET_NULL, null=True)
+    hora_inicio = models.TimeField(null=True)
     hora_retorno = models.TimeField()
     enviado = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'horario_retorno'
+    
+    def __str__(self):
+        return f"{self.cita} ({self.hora_inicio} - {self.hora_retorno})"
 
 class TipoAlerta(models.Model):
     nombre = models.CharField(max_length=100)

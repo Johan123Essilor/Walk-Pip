@@ -1,10 +1,11 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Cita, HistorialUsuarioRuta
+from .models import Cita, HistorialUsuarioRuta, Ruta
 from users.models import HorarioRetorno
-from .serializers import CitaSerializer, HistorialUsuarioRutaSerializer
+from .serializers import CitaSerializer, HistorialUsuarioRutaSerializer, RutaSerializer
 
 class CitaViewSet(viewsets.ModelViewSet):
     serializer_class = CitaSerializer
@@ -106,4 +107,16 @@ class HistorialUsuarioRutaViewSet(viewsets.ModelViewSet):
         serializer.save()
         
         return Response(serializer.data)
-
+    
+class RutaViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar las rutas.
+    Permite:
+    - GET: listar o ver detalle
+    - POST: crear una ruta
+    - PUT/PATCH: actualizar una ruta
+    - DELETE: eliminar una ruta
+    """
+    queryset = Ruta.objects.all()
+    serializer_class = RutaSerializer
+    permission_classes = [IsAuthenticated]

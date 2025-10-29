@@ -59,7 +59,17 @@ class InvitarMultiplesUsuariosSerializer(serializers.Serializer):
     )
     rol = serializers.CharField(default='Miembro')
 
+class EmptySerializer(serializers.Serializer):
+    """Serializer vacío para endpoints que no requieren datos."""
+    pass
+
+
+class TransferOwnershipSerializer(serializers.Serializer):
+    """Serializer para transferir la propiedad de un grupo."""
+    nuevo_creador_id = serializers.IntegerField(help_text="ID del nuevo creador del grupo")
+    
 class ProgramarActividadSerializer(serializers.Serializer):
     ruta_id = serializers.IntegerField()
     fecha_actividad = serializers.DateTimeField()
     descripcion = serializers.CharField(required=False, allow_blank=True)
+

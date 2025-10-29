@@ -5,9 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from .models import Grupo, UsuarioGrupo
 from .serializers import (
-    GrupoSerializer, UsuarioGrupoSerializer, 
-    InvitarUsuarioSerializer, ProgramarActividadSerializer, 
-    InvitarMultiplesUsuariosSerializer
+    GrupoSerializer, UsuarioGrupoSerializer, ProgramarActividadSerializer, 
+    InvitarMultiplesUsuariosSerializer, EmptySerializer, TransferOwnershipSerializer
 )
 from users.models import Usuario
 
@@ -32,6 +31,10 @@ class GrupoViewSet(viewsets.ModelViewSet):
             return UsuarioGrupoSerializer
         elif self.action in ['schedule_activity']:
             return ProgramarActividadSerializer
+        elif self.action in ['accept_invitation', 'join', 'leave']:
+            return EmptySerializer
+        elif self.action == 'transfer_ownership':
+            return TransferOwnershipSerializer
         return GrupoSerializer
 
     # --------------------------
@@ -174,18 +177,6 @@ class GrupoViewSet(viewsets.ModelViewSet):
             'grupo': grupo.nombre,
             'datos': serializer.validated_data
         })
-
-    @action(detail=True, methods=['post'])
-    def join(self, request, pk=None):
-        """Unirse a un grupo público"""
-        grupo = self.get_object()
-        if UsuarioGrupo.objects.filter(usuario=request.user, grupo=grupo).exists():
-            return Response({'error': 'Ya eres miembro de este grupo'}, status=400)
-
-        UsuarioGrupo.objects.create(
-            usuario=request.user, grupo=grupo, rol='Miembro', aceptado=True
-        )
-        return Response({'mensaje': 'Te has unido al grupo exitosamente'})
 
     @action(detail=True, methods=['post'])
     def leave(self, request, pk=None):

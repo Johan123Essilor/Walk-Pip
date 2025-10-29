@@ -7,7 +7,6 @@ class RutaSerializer(serializers.ModelSerializer):
         model = Ruta
         fields = "__all__"
 
-
 class MapaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Mapa

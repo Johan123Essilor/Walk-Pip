@@ -208,19 +208,25 @@ const TrailDirectory = () => {
       usuario: user,
       ruta: selectedTrail.id,
       fecha_visita: fechaVisitaISO,
-      hora_retorno: fechaVisitaISO,
       clima: selectedHourlyWeather.text,
       recomendaciones: selectedTrail.recomendaciones,
       compania: "N/A"
     };
 
     try {
-      // Aquí iría tu llamada a la API para agendar
+      const response = await fetch("http://127.0.0.1:8000/trail/agendar/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${user.token}` // JWT
+      },
+      body: JSON.stringify(appointment),
+    });
       console.log('Appointment data:', appointment);
-      alert("✅ Cita agendada correctamente.");
+      alert("Cita agendada correctamente.");
     } catch (err) {
       console.error(err);
-      alert("❌ Error al agendar cita.");
+      alert("Error al agendar cita.");
     }
   };
 

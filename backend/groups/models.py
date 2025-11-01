@@ -19,4 +19,3 @@ class UsuarioGrupo(models.Model):
     class Meta:
         db_table = 'usuario_grupo'
 
-

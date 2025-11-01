@@ -1,8 +1,11 @@
-asgiref==3.9.1
-Django==5.2.6
-django-cors-headers==4.9.0
+core==1.0.1
+Django==5.2.7
 djangorestframework==3.16.1
-drf-yasg==1.21.10
+djangorestframework_simplejwt==5.5.1
+drf_yasg==1.21.11
+
+asgiref==3.9.1
+django-cors-headers==4.9.0
 inflection==0.5.1
 packaging==25.0
 pytz==2025.2

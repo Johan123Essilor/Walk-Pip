@@ -5,14 +5,110 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import viewsets, mixins
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny  # ✅ Asegúrate de tener AllowAny
 from django.contrib.auth import authenticate
 from trail.models import HistorialUsuarioRuta, Cita
 from datetime import datetime, date
-from .models import Usuario, Review, Condicion, UsuarioCondicion, Salud, ContactoEmergencia, HorarioRetorno
+
+# ✅ AÑADE TipoUsuario A ESTA IMPORTACIÓN:
+from .models import Usuario, Review, Condicion, UsuarioCondicion, Salud, ContactoEmergencia, HorarioRetorno, TipoUsuario
+
 from .serializers import UserRegisterSerializer, UserSerializer, LoginSerializer, ReviewSerializer, SaludSerializer, CondicionSerializer, UsuarioCondicionSerializer, ContactoEmergenciaSerializer, HorarioRetornoSerializer
 
+from rest_framework.decorators import api_view, permission_classes
+from django.db import transaction
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def sync_auth0_user(request):
+    """
+    Sincroniza usuario de Auth0 con la base de datos Django
+    """
+    try:
+        # Obtener datos del request de Auth0
+        auth0_id = request.data.get('sub')
+        email = request.data.get('email')
+        name = request.data.get('name')
+        picture = request.data.get('picture')
+        
+        print(f"Recibiendo datos de Auth0: {email}, {auth0_id}")
+
+        if not auth0_id or not email:
+            return Response(
+                {'error': 'sub and email are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 🔒 VERIFICACIÓN ALTERNATIVA: Podemos validar otros datos en lugar del token
+        # Por ahora, confiamos en los datos mientras estamos en desarrollo
+        
+        with transaction.atomic():
+            try:
+                user = Usuario.objects.get(correo=email)
+                created = False
+                
+                if name and user.nombre != name:
+                    user.nombre = name
+                
+                user.auth0_id = auth0_id
+                
+                if picture:
+                    user.picture = picture
+                    
+                user.save()
+                print(f"✅ Usuario actualizado: {user.correo}")
+                
+            except Usuario.DoesNotExist:
+                from .models import TipoUsuario
+                
+                tipo_default = TipoUsuario.objects.first()
+                if not tipo_default:
+                    tipo_default = TipoUsuario.objects.create(
+                        nombre="Usuario",
+                        descripcion="Usuario regular",
+                        nivel="basic"
+                    )
+                
+                user = Usuario.objects.create(
+                    nombre=name or email.split('@')[0],
+                    correo=email,
+                    tipo_usuario=tipo_default,
+                    auth0_id=auth0_id,
+                    picture=picture
+                )
+                
+                # Contraseña simple temporal
+                user.set_password("auth0_temp_password_123")
+                user.save()
+                created = True
+                print(f"✅ Nuevo usuario creado: {user.correo}")
+        
+        user_data = {
+            'id': user.id,
+            'nombre': user.nombre,
+            'correo': user.correo,
+            'edad': user.edad,
+            'fecha_registro': user.fecha_registro,
+            'auth0_id': user.auth0_id,
+            'picture': user.picture,
+            'tipo_usuario': {
+                'id': user.tipo_usuario.id,
+                'nombre': user.tipo_usuario.nombre
+            } if user.tipo_usuario else None,
+        }
+        
+        return Response({
+            'user': user_data,
+            'created': created,
+            'message': 'Usuario creado exitosamente' if created else 'Usuario actualizado'
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"❌ Error en sync_auth0_user: {str(e)}")
+        return Response(
+            {'error': f'Error del servidor: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 class RegisterView(generics.CreateAPIView):
     serializer_class = UserRegisterSerializer
 

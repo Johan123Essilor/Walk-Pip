@@ -29,13 +29,18 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
         return self.create_user(correo, nombre, contrasena, **extra_fields)
 
+# En users/models.py - MODIFICA LA CLASE Usuario
 class Usuario(AbstractBaseUser, PermissionsMixin):
     nombre = models.CharField(max_length=100)
     correo = models.EmailField(unique=True)
     edad = models.IntegerField(null=True, blank=True)
-    session_activa = models.BooleanField(default= False)
+    session_activa = models.BooleanField(default=False)
     fecha_registro = models.DateField(auto_now_add=True)
     tipo_usuario = models.ForeignKey(TipoUsuario, on_delete=models.CASCADE)
+    
+    # CAMPOS PARA AUTH0 - con null=True para evitar errores de migración
+    auth0_id = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    picture = models.URLField(blank=True, null=True)
     
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -51,6 +56,16 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.correo
 
+    # AÑADE ESTAS PROPIEDADES PARA MANEJAR LOS CAMPOS FALTANTES
+    @property
+    def auth0_id_safe(self):
+        """Devuelve auth0_id si existe, sino None"""
+        return getattr(self, 'auth0_id', None)
+    
+    @property
+    def picture_safe(self):
+        """Devuelve picture si existe, sino None"""
+        return getattr(self, 'picture', None)
 class Salud(models.Model):
     usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     peso = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)

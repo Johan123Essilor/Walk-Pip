@@ -35,16 +35,40 @@ class HistorialUsuarioRuta(models.Model):
 class Cita(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     ruta = models.ForeignKey(Ruta, on_delete=models.CASCADE)
-    compania = models.ForeignKey(Grupo, on_delete=models.SET_NULL, null=True, blank=True)
+    compania = models.ForeignKey('groups.Grupo', on_delete=models.SET_NULL, null=True, blank=True)  # ✅ Ya existe
     fecha_visita = models.DateTimeField()
     clima = models.CharField(max_length=200)
     recomendaciones = models.TextField()
     creado_en = models.DateTimeField(auto_now_add=True)
+    
+    # ✅ Añadir campo para invitados individuales
+    invitados = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, 
+        through='InvitacionCita', 
+        related_name='citas_invitado',
+        blank=True
+    )
 
     class Meta:
         db_table = 'cita'
 
     def __str__(self):
         return f"{self.usuario} - {self.ruta}"
+
+class InvitacionCita(models.Model):
+    ESTADOS = [
+        ('pendiente', 'Pendiente'),
+        ('aceptada', 'Aceptada'),
+        ('rechazada', 'Rechazada'),
+    ]
     
+    cita = models.ForeignKey(Cita, on_delete=models.CASCADE)
+    invitado = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+    fecha_invitacion = models.DateTimeField(auto_now_add=True)
+    fecha_respuesta = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'invitacion_cita'
+        unique_together = ['cita', 'invitado']
 

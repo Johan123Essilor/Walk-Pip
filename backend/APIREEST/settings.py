@@ -95,13 +95,27 @@ WSGI_APPLICATION = 'APIREEST.wsgi.application'
 #     }
 # }
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'walk_pip',  # Nombre de la base de datos
+#         'USER': 'walk_pip_user',
+#         'PASSWORD': 'PbcTARUb55v0GzLGeQP9rWSStlstV6IV',  # Coloca tu contraseña de Render
+#         'HOST': 'dpg-d3puj0vdiees73c5a76g-a.oregon-postgres.render.com',
+#         'PORT': '5432',
+#         'OPTIONS': {
+#             'sslmode': 'require',  # Render exige SSL
+#         },
+#     }
+# }
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'walk_pip',  # Nombre de la base de datos
-        'USER': 'walk_pip_user',
-        'PASSWORD': 'PbcTARUb55v0GzLGeQP9rWSStlstV6IV',  # Coloca tu contraseña de Render
-        'HOST': 'dpg-d3puj0vdiees73c5a76g-a.oregon-postgres.render.com',
+        'NAME': 'walk_pip_new',  # Nombre de la base de datos
+        'USER': 'walk_pip_user_new',
+        'PASSWORD': 'QIHVrHGJbyrzcugLiFZLW1nQm2NyIYyN',  # Coloca tu contraseña de Render
+        'HOST': 'dpg-d43v0tje5dus73ac7h6g-a.oregon-postgres.render.com',
         'PORT': '5432',
         'OPTIONS': {
             'sslmode': 'require',  # Render exige SSL

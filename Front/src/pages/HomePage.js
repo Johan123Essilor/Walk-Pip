@@ -13,19 +13,19 @@ const HomePage = () => {
         <Container className='py-3 mb-5'>
           <Row className='justify-content-center align-items-center mx-auto'>
             <Col md={8} className='text-md-start text-center'>
-            <h2>Newsletter</h2>
-            <p >Sign up today for our newsletter and stay up-to-date with our latest updates</p>
+            <h2>Walk-Pip</h2>
+            <p >Encuentra tu ruta ideal</p>
             </Col>
-            <Col className='text-center'>
+            {/* <Col className='text-center'>
               <NewsletterSignup />
-            </Col>
+            </Col> */}
           </Row>
         </Container>
       </div>
-
+{/* 
       <div>
         <FeaturedTrails />
-      </div>
+      </div> */}
 
       <div>
         <Container className='py-3 mb-5'>
@@ -34,8 +34,8 @@ const HomePage = () => {
               <img src={exploreImage} alt='explore' className='img-fluid d-none d-md-block' />
             </Col>
             <Col>
-              <h1>About Us</h1>
-              <p className='lead'>Click the button to learn more about who we are, and what we stand for!</p>
+              <h1>Nosotros</h1>
+              <p className='lead'>¡Haz clic en el botón para saber más sobre quiénes somos!</p>
               <a href='/about-us' className='btn btn-success btn-lg'>
                 Learn More
               </a>

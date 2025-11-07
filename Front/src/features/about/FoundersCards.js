@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Container, Row, Col } from 'reactstrap';
-import tylerVarzeas from '../../app/assets/img/tyler-varzeas-medium.jpeg';
-import marissaVarzeas from '../../app/assets/img/marissa-varzeas-medium.jpeg';
-import chrisParry from '../../app/assets/img/chris-parry-medium.jpeg';
+import johanLozoya from '../../app/assets/img/johan.jpeg';
+import Yael from '../../app/assets/img/yael.jpeg';
+import Alma from '../../app/assets/img/alma.jpeg';
 
 const FoundersCards = () => {
     const [ activeIndex, setActiveIndex ] = useState(0);
@@ -10,24 +10,24 @@ const FoundersCards = () => {
     const founderCards = [
         {
             id: 1,
-            name: 'Tyler Varzeas',
-            title: 'Founder',
-            img: tylerVarzeas,
-            description: 'Tyler Varzeas is the CEO, CFO, and MFG of Find My Trail. He has been developing and improving Find My Trail since 2023.'
+            name: 'Johan Lozoya',
+            title: 'Mera Maquina',
+            img: johanLozoya,
+            description: 'Desarrollador de software con una pasión por la creación de aplicaciones web innovadoras y funcionales.'
         },
         {
             id: 2,
-            name: 'Marissa Varzeas',
-            title: 'Co-Founder',
-            img: marissaVarzeas,
-            description: "Marissa and Tyler Varzeas have been married over a year and are each other's number one supporters through it all."
+            name: 'Yael Contreras',
+            title: 'Maistro 1',
+            img: Yael,
+            description: "Levanta castillos y domina el arte de la programación."
         },
         {
             id: 3,
-            name: 'Chris Parry',
-            title: 'Co-Founder',
-            img: chrisParry,
-            description: 'Chris Parry is the long-time best friend of Tyler Varzeas and has been working with the company since 2023.'
+            name: 'Alma Diaz',
+            title: 'Jefe e equipo',
+            img: Alma,
+            description: 'Patrona del equipo, siempre lista para apoyar y guiar en cada paso del desarrollo.'
         }
     ]
     

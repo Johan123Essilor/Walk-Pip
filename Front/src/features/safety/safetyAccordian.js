@@ -1,60 +1,61 @@
 import { Row, Col } from 'reactstrap';
+
 const SafetyAccordian = () => {
 
     const ruleSet = [
         {
             id: 1,
             tagId: "One", 
-            rule: "Rule #1",
-            title: "Know Your Limits",
-            description: "I know, I know, probably not what most adventurers and thrill-seekers want to hear right off the bat when preparing for a hike... but this one is important! Being aware of your experience level, your physical capabilites, and social necessities matter more than anything else when traversing unknown or potentially dangerous terrain. The last thing you or anyone else would want, is to call for a search and rescue team!"
+            rule: "Regla #1",
+            title: "Conoce tus límites",
+            description: "Lo sé, lo sé... probablemente no es lo que la mayoría de los aventureros o amantes de la adrenalina quieren escuchar justo antes de prepararse para una caminata... ¡pero esta es importante! Ser consciente de tu nivel de experiencia, tus capacidades físicas y tus necesidades sociales importa más que cualquier otra cosa cuando recorres terrenos desconocidos o potencialmente peligrosos. ¡Lo último que tú o alguien más quisiera es tener que llamar a un equipo de búsqueda y rescate!"
         },
         {
             id: 2,
             tagId: "Two",
-            rule: "Rule #2",
-            title: "Plan Your Hike",
-            description: "Plan your trip using...what do you know! This website! Make sure you are aware of what trail you want to visit, where exactly it is, its difficulty and safety ratings, as well as any equipment that you will need to be successful and safe on this hike. Two things you should consider before leaving:",
+            rule: "Regla #2",
+            title: "Planifica tu caminata",
+            description: "Planifica tu viaje usando... ¡este sitio web! Asegúrate de saber qué sendero quieres visitar, dónde se encuentra exactamente, su nivel de dificultad y seguridad, así como cualquier equipo que necesites para tener una caminata exitosa y segura. Dos cosas que deberías considerar antes de salir:",
             subList: [
                 {
-                    subTitle: "Leave a Trip Plan",
-                    subDescription: "This is a plan of your trip (where you are hiking, contact info, dates and times for leaving/returning, etc.) that you can leave at home or with someone else so that others are aware of where you will be and when you are expected to be gone."
+                    subTitle: "Deja un plan de viaje",
+                    subDescription: "Este es un plan de tu recorrido (dónde estarás caminando, información de contacto, fechas y horarios de salida/regreso, etc.) que puedes dejar en casa o con alguien más, para que otros sepan dónde estarás y cuándo esperas regresar."
                 },
                 {
-                    subTitle: "Have a Backup Plan",
-                    subDescription: "This one is probably a bit self-explanatory. Things don't always go right or as they are expected to, so in case of an emergency, have a plan ready! CPR and First Aid trainings are a great start for always being prepared."
+                    subTitle: "Ten un plan de respaldo",
+                    subDescription: "Esta probablemente se explica sola. Las cosas no siempre salen bien o como se espera, así que en caso de emergencia, ¡ten un plan preparado! Los entrenamientos en RCP y primeros auxilios son un excelente comienzo para estar siempre preparado."
                 }
             ],
-            subText: "It is also important to be ready for any possible changes in weather conditions that are within reason for the area or any park alerts. Note to always have a means of communication (cell-phones are NOT reliable!) like a personal locator beacon."
+            subText: "También es importante estar preparado para cualquier posible cambio en las condiciones del clima dentro de lo razonable para la zona o cualquier alerta del parque. Recuerda tener siempre un medio de comunicación (¡los teléfonos celulares NO son confiables!) como un localizador personal."
         },
         {
             id: 3,
             tagId: "Three",
-            rule: "Rule #3",
-            title: "What to Bring",
-            description: "The National Park Service suggest you bring your 10 essential things that you should NEED to be bringing with you on your hike. Some of which likely include:",
+            rule: "Regla #3",
+            title: "Qué llevar contigo",
+            description: "El Servicio de Parques Nacionales sugiere que lleves contigo los 10 elementos esenciales que deberías tener en toda caminata. Algunos de ellos incluyen:",
             listItems: [
-                "Food and Water",
-                "Proper Footware",
-                "Bug Spray",
-                "Water Filter/Purifier",
-                "Backpack",
-                "Tent",
-                "Sleeping Bag",
-                "First Aid Kit",
-                "Sunscreen",
-                "Flashlight"
+                "Comida y agua",
+                "Calzado adecuado",
+                "Repelente de insectos",
+                "Filtro/Purificador de agua",
+                "Mochila",
+                "Tienda de campaña",
+                "Saco de dormir",
+                "Botiquín de primeros auxilios",
+                "Protector solar",
+                "Linterna"
             ],
-            subText: "Anything else you are thinking about bringing because you might need it... bring it!"
+            subText: "Cualquier otra cosa que creas que podrías necesitar... ¡llévala!"
         },
         {
             id: 4,
             tagId: "Four",
-            rule: "Rule #4",
-            title: "Hike Safely",
-            description: "This one seems obvious right... kinda what we have been talking about this entire time. Let's just take a step back and look at the big picture. The essential things that will keep you safe on your average, everday day-hike include eating and drinking food and water, taking your time and watching where you walk, spraying for mosquitos and other nasty bugs, and of course ASK FOR HELP from a park ranger or a nearby hiker if you need it. Stay safe out there!"
+            rule: "Regla #4",
+            title: "Camina con seguridad",
+            description: "Esta parece obvia, ¿verdad?... es básicamente de lo que hemos estado hablando todo el tiempo. Tomémonos un momento para ver el panorama general. Las cosas esenciales que te mantendrán seguro en una caminata diaria incluyen comer y beber suficiente agua, tomarte tu tiempo y mirar por dónde caminas, usar repelente contra mosquitos y otros insectos molestos, y por supuesto ¡PEDIR AYUDA! a un guardabosques o a otro excursionista si la necesitas. ¡Mantente seguro allá afuera!"
         }
-    ]
+    ];
 
     return (
         <div className="accordion my-5" id="accordionExample">
@@ -88,10 +89,10 @@ const SafetyAccordian = () => {
                             <div className="accordion-body">
                                 {description}
                                 {subList ? (
-                                    <div className='mt-3' >
+                                    <div className='mt-3'>
                                         {subList.map(({subTitle, subDescription}) => {
                                             return (
-                                                <div>
+                                                <div key={subTitle}>
                                                     <h5 className='fw-bold text-success'>{subTitle}</h5>
                                                     <p>{subDescription}</p>
                                                 </div>
@@ -139,7 +140,7 @@ const SafetyAccordian = () => {
                             </div>
                         </div>
                     </div>
-                )
+                );
             })}
         </div>
     );

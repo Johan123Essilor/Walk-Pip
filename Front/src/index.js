@@ -16,6 +16,7 @@ import { BrowserRouter } from 'react-router-dom';
 const container = document.getElementById('root');
 const root = createRoot(container);
 
+// En src/index.js
 root.render(
   <Auth0Provider
     domain={process.env.REACT_APP_AUTH0_DOMAIN}
@@ -23,6 +24,8 @@ root.render(
     authorizationParams={{
       redirect_uri: window.location.origin
     }}
+    cacheLocation="localstorage" // ✅ Añade esta línea
+    useRefreshTokens={true} // ✅ Opcional: para tokens de refresco
   >
     <React.StrictMode>
       <Provider store={store}>

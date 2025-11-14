@@ -39,7 +39,7 @@ def sync_auth0_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 🔒 VERIFICACIÓN ALTERNATIVA: Podemos validar otros datos en lugar del token
+        # VERIFICACIÓN ALTERNATIVA: Podemos validar otros datos en lugar del token
         # Por ahora, confiamos en los datos mientras estamos en desarrollo
         
         with transaction.atomic():
@@ -56,23 +56,23 @@ def sync_auth0_user(request):
                     user.picture = picture
                     
                 user.save()
-                print(f"✅ Usuario actualizado: {user.correo}")
+                print(f"Usuario actualizado: {user.correo}")
                 
             except Usuario.DoesNotExist:
                 from .models import TipoUsuario
                 
-                tipo_default = TipoUsuario.objects.first()
-                if not tipo_default:
-                    tipo_default = TipoUsuario.objects.create(
-                        nombre="Usuario",
-                        descripcion="Usuario regular",
-                        nivel="basic"
-                    )
+                # # tipo_default = TipoUsuario.objects.first()
+                # if not tipo_default:
+                #     tipo_default = TipoUsuario.objects.create(
+                #         nombre="usuario",
+                #         descripcion="Usuario regular",
+                #         nivel="basic"
+                #     )
                 
                 user = Usuario.objects.create(
                     nombre=name or email.split('@')[0],
                     correo=email,
-                    tipo_usuario=tipo_default,
+                    tipo_usuario=2,
                     auth0_id=auth0_id,
                     picture=picture
                 )
@@ -104,7 +104,7 @@ def sync_auth0_user(request):
         }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
         
     except Exception as e:
-        print(f"❌ Error en sync_auth0_user: {str(e)}")
+        print(f"Error en sync_auth0_user: {str(e)}")
         return Response(
             {'error': f'Error del servidor: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -143,9 +143,8 @@ class LoginView(generics.CreateAPIView):
     
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
-    permission_classes = [IsAuthenticated]
-    
-    # Permitir solo GET, POST, PUT, PATCH, DELETE
+    permission_classes = [AllowAny]
+
     http_method_names = ['get', 'post', 'put', 'patch']
 
     def get_queryset(self):
@@ -154,29 +153,58 @@ class ReviewViewSet(viewsets.ModelViewSet):
         return Review.objects.all()
 
     def perform_create(self, serializer):
-        # Asignar automáticamente el usuario logueado
-        serializer.save(usuario=self.request.user)
+        from users.models import Usuario
+        try:
+            # Buscar usuario por email de Auth0 o usar uno por defecto
+            user_email = self.request.data.get('user_email')
+            if user_email:
+                user = Usuario.objects.get(correo=user_email)
+            else:
+                # Usuario por defecto si no se proporciona email
+                user = Usuario.objects.get(correo="johanlozoya14@gmail.com")
+        except Usuario.DoesNotExist:
+            # Fallback: usar el primer usuario disponible
+            user = Usuario.objects.first()
+        
+        serializer.save(usuario=user)
 
     def update(self, request, *args, **kwargs):
-        """Solo permitir actualizar reseñas propias"""
+        """
+        Solo permitir actualizar reseñas propias (validación por email)
+        """
         instance = self.get_object()
-        if instance.usuario != request.user:
+
+        user_email = request.data.get('user_email')
+        if not user_email:
+            return Response({"error": "user_email requerido."}, status=400)
+
+        if instance.usuario.correo != user_email:
             return Response(
-                {'error': 'No puedes actualizar reseñas de otros usuarios'},
+                {'error': 'Solo puedes actualizar tus propias reseñas.'},
                 status=status.HTTP_403_FORBIDDEN
             )
+
         return super().update(request, *args, **kwargs)
 
-    # Solo este endpoint personalizado que agrega valor
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['post'])
     def mis_reviews(self, request):
         """
-        Endpoint específico para obtener solo las reseñas del usuario logueado
+        Obtener reseñas propias (validación por email)
         """
-        reviews = Review.objects.filter(usuario=request.user)
+        user_email = request.data.get('user_email')
+
+        if not user_email:
+            return Response({"error": "user_email requerido."}, status=400)
+
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+        except Usuario.DoesNotExist:
+            return Response({"error": "Usuario no encontrado"}, status=404)
+
+        reviews = Review.objects.filter(usuario=usuario)
         serializer = self.get_serializer(reviews, many=True)
         return Response(serializer.data)
-
+    
 class PerfilView(mixins.RetrieveModelMixin,
                  mixins.UpdateModelMixin,
                  mixins.ListModelMixin,

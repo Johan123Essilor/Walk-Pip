@@ -42,13 +42,8 @@ class LoginSerializer(serializers.ModelSerializer):
 class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
-        fields = ['usuario', 'ruta', 'puntuacion', 'comentario', 'fecha', 'estado']
-        read_only_fields = ['usuario', 'fecha']  # usuario se asigna automáticamente
-
-    def create(self, validated_data):
-        # Asignar automáticamente el usuario logueado
-        validated_data['usuario'] = self.context['request'].user
-        return super().create(validated_data)
+        fields = ['id', 'ruta', 'puntuacion', 'comentario', 'estado', 'fecha']
+        read_only_fields = ['fecha']
     
 class ContactoEmergenciaSerializer(serializers.ModelSerializer):
     class Meta:

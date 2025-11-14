@@ -52,11 +52,11 @@ const Header = () => {
                             <i className='fa fa-info fa-lg' /> Nosotros 
                         </NavLink>
                     </NavItem>
-                    {/* <NavItem>
-                        <NavLink className='nav-link' to='/contact-us'>
-                            <i className='fa fa-address-card fa-lg' /> Contacto
-                        </NavLink>
-                    </NavItem> */}
+                 {/* <NavItem>
+    <NavLink className='nav-link' to='/register'>
+        <i className='fa fa-user-plus fa-lg' /> Registrarse
+    </NavLink>
+</NavItem> */}
                     <NavItem className='text-end'>
                         {isAuthenticated ? (
                             <div className='btn-group mx-3'>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Container, Row, Col } from 'reactstrap';
 import { useAuth0 } from '@auth0/auth0-react';
+import ReviewsSection from './ReviewsSection';
 
 const TrailDirectory = () => {
   const [selectedTrail, setSelectedTrail] = useState(null);
@@ -934,9 +935,13 @@ const TrailDirectory = () => {
                         textAlign: 'center',
                         marginTop: '8px'
                       }}>
-                        ⚠️ Problema de autenticación. Recarga la página.
+                        Problema de autenticación. Recarga la página.
                       </p>
                     )}
+                     <ReviewsSection 
+        trailId={selectedTrail.id} 
+        trailName={selectedTrail.nombre} 
+      />
                   </>
                 ) : (
                   <div style={{ 

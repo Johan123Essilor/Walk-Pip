@@ -32,7 +32,7 @@ function App() {
         <Route path='/safety' element={ <SafetyPage /> } />
         <Route path='/about-us' element={ <AboutPage /> } />
         <Route path='/user-profile' element={ <UserProfile /> } />
-      </Routes>
+      </Routes >
       <Footer />
     </div>
   );

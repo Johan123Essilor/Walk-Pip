@@ -27,12 +27,12 @@ export const useUserSync = () => {
       try {
         console.log('🔄 Sincronizando usuario con Django...', user.email);
 
-        // ✅ SIN TOKEN - solo enviamos los datos básicos
+        //  SIN TOKEN - solo enviamos los datos básicos
         const response = await fetch('http://localhost:8000/users/auth0/sync/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            // ❌ QUITAMOS Authorization header
+            // QUITAMOS Authorization header
           },
           body: JSON.stringify({
             email: user.email,
@@ -55,7 +55,7 @@ export const useUserSync = () => {
         setDjangoUser(userData.user || userData);
         
       } catch (error) {
-        console.error('❌ Error sincronizando usuario:', error);
+        console.error('Error sincronizando usuario:', error);
         setSyncError(error.message);
       } finally {
         setIsSyncing(false);
@@ -63,7 +63,7 @@ export const useUserSync = () => {
     };
 
     syncUserWithBackend();
-  }, [isAuthenticated, user]); // ✅ Quitamos getAccessTokenSilently de las dependencias
+  }, [isAuthenticated, user]); // Quitamos getAccessTokenSilently de las dependencias
 
   return { isSyncing, syncError, djangoUser };
 };

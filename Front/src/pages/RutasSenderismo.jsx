@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { rutasService } from '../services';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css'; // Importar los iconos
 
 export const RutasSenderismo = () => {
     // Estado para controlar la vista (cards o lista)
+    const navigate = useNavigate();
     const [vista, setVista] = useState('cards');
     const [rutas, setRutas] = useState([]);
     const [allRutas, setAllRutas] = useState([]); // copia completa para filtrar localmente
@@ -41,7 +43,9 @@ export const RutasSenderismo = () => {
                 descripcion: ruta.descripcion,
                 imagen: ruta.imagen || 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400', // Imagen por defecto si no hay
                 altitud: "800 m",
-                tipo: "Circular"
+                tipo: "Circular",
+                lat: parseFloat(ruta.lat) || 25.6345,
+                lon: parseFloat(ruta.lon) || -100.5528
             }));
             setRutas(parsedRutas);
             setAllRutas(parsedRutas);
@@ -118,6 +122,11 @@ export const RutasSenderismo = () => {
             default:
                 return 'Desconocida';
         }
+    };
+
+    // Navegar a TrailDirectory con lat/lon al hacer doble clic
+    const handleCardDoubleClick = (ruta) => {
+        navigate(`/trail-directory?lat=${ruta.lat}&lon=${ruta.lon}&id=${ruta.id}`);
     };
 
     if (loading) {
@@ -211,8 +220,8 @@ export const RutasSenderismo = () => {
             {vista === 'cards' && (
                 <div className="row">
                     {rutas.map((ruta) => (
-                        <div key={ruta.id} className="col-lg-6 col-xl-4 mb-4">
-                            <div className="card h-100 shadow-sm">
+                        <div key={ruta.id} className="col-lg-6 col-xl-4 mb-4" onDoubleClick={() => handleCardDoubleClick(ruta)}>
+                            <div className="card h-100 shadow-sm" style={{ cursor: 'pointer' }}>
                                 <img
                                     src={ruta.imagen}
                                     className="card-img-top"
@@ -263,7 +272,7 @@ export const RutasSenderismo = () => {
             {vista === 'lista' && (
                 <div className="list-group">
                     {rutas.map((ruta) => (
-                        <div key={ruta.id} className="list-group-item list-group-item-action">
+                        <div key={ruta.id} className="list-group-item list-group-item-action" onDoubleClick={() => handleCardDoubleClick(ruta)} style={{ cursor: 'pointer' }}>
                             <div className="row align-items-center">
                                 <div className="col-md-2">
                                     <img

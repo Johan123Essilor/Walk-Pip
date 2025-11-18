@@ -16,7 +16,7 @@ import LogoutButton from './LogoutButton';
 import { useUserSync } from '../hooks/useUserSync'; // Importar el hook
 
 const Header = () => {
-    const [ menuOpen, setMenuOpen ] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
     const { user, isAuthenticated } = useAuth0();
     const { isSyncing, syncError, djangoUser } = useUserSync(); // Usar el hook
 
@@ -38,7 +38,7 @@ const Header = () => {
                         </NavLink>
                     </NavItem>
                     <NavItem>
-                        <NavLink className='nav-link' to='/trail-directory'>
+                        <NavLink className='nav-link' to='/list-routes'> {/* trail-directory */}
                             <i className='fa fa-list fa-lg' /> Rutas
                         </NavLink>
                     </NavItem>
@@ -49,10 +49,10 @@ const Header = () => {
                     </NavItem>
                     <NavItem>
                         <NavLink className='nav-link' to='/about-us'>
-                            <i className='fa fa-info fa-lg' /> Nosotros 
+                            <i className='fa fa-info fa-lg' /> Nosotros
                         </NavLink>
                     </NavItem>
-                 {/* <NavItem>
+                    {/* <NavItem>
     <NavLink className='nav-link' to='/register'>
         <i className='fa fa-user-plus fa-lg' /> Registrarse
     </NavLink>
@@ -60,12 +60,12 @@ const Header = () => {
                     <NavItem className='text-end'>
                         {isAuthenticated ? (
                             <div className='btn-group mx-3'>
-                                <a 
-                                    className='dropdown-toggle d-flex align-items-center' 
-                                    href='/user-profile' 
-                                    role='button' 
-                                    data-bs-toggle='dropdown' 
-                                    data-bs-display='static' 
+                                <a
+                                    className='dropdown-toggle d-flex align-items-center'
+                                    href='/user-profile'
+                                    role='button'
+                                    data-bs-toggle='dropdown'
+                                    data-bs-display='static'
                                     aria-expanded='false'
                                 >
                                     {/* Indicador de sincronización */}
@@ -74,10 +74,10 @@ const Header = () => {
                                             <span className="visually-hidden">Sincronizando...</span>
                                         </div>
                                     )}
-                                    <img 
-                                        src={user.picture} 
-                                        alt={user.name} 
-                                        className='nav-user-img img-fluid rounded mx-3' 
+                                    <img
+                                        src={user.picture}
+                                        alt={user.name}
+                                        className='nav-user-img img-fluid rounded mx-3'
                                     />
                                     {/* Indicador de estado de sincronización */}
                                     {djangoUser && !isSyncing && (
@@ -91,7 +91,7 @@ const Header = () => {
                                 <ul className='dropdown-menu bg-success dropdown-menu-lg-end text-center p-2'>
                                     <li className='my-2'>
                                         <a className='dropdown-item' href='/user-profile'>
-                                            <i className='fa fa-user fa-lg'/> Perfil
+                                            <i className='fa fa-user fa-lg' /> Perfil
                                         </a>
                                     </li>
                                     <li>
@@ -116,15 +116,15 @@ const Header = () => {
 
             {/* Alerta de error de sincronización */}
             {syncError && (
-                <div 
-                    className="alert alert-warning alert-dismissible fade show m-0 rounded-0 position-fixed w-100" 
-                    style={{zIndex: 9999, top: '76px'}}
+                <div
+                    className="alert alert-warning alert-dismissible fade show m-0 rounded-0 position-fixed w-100"
+                    style={{ zIndex: 9999, top: '76px' }}
                     role="alert"
                 >
                     <strong>Error de sincronización:</strong> {syncError}
-                    <button 
-                        type="button" 
-                        className="btn-close" 
+                    <button
+                        type="button"
+                        className="btn-close"
                         data-bs-dismiss="alert"
                         onClick={() => window.location.reload()}
                     ></button>

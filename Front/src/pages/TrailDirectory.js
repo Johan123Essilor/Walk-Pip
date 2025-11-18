@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Container, Row, Col } from 'reactstrap';
 import { useAuth0 } from '@auth0/auth0-react';
 import ReviewsSection from './ReviewsSection';
 
 const TrailDirectory = () => {
+  const [searchParams] = useSearchParams();
   const [selectedTrail, setSelectedTrail] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
   const [hourlyWeather, setHourlyWeather] = useState(null);
@@ -20,7 +22,7 @@ const TrailDirectory = () => {
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [showFriendSelector, setShowFriendSelector] = useState(false);
-  
+
   const { user, isAuthenticated, loginWithRedirect, getAccessTokenSilently } = useAuth0();
 
   const mapRef = useRef(null);
@@ -33,33 +35,33 @@ const TrailDirectory = () => {
     try {
       console.log('🔄 Obteniendo rutas desde el backend...');
       const response = await fetch('http://localhost:8000/trail/rutas/');
-      
+
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
       }
-      
+
       const rutasData = await response.json();
       console.log('✅ Rutas obtenidas:', rutasData);
-      
+
       // Verificar si hay datos y mapearlos correctamente
       if (rutasData && Array.isArray(rutasData)) {
         const formattedTrails = rutasData.map(ruta => ({
           id: ruta.id,
           nombre: ruta.nombre || 'Ruta sin nombre',
-          lat: parseFloat(ruta.lat) || 25.6047,
-          lon: parseFloat(ruta.lon) || -100.2511,
+          lat: parseFloat(ruta.lat) || 32.525045,
+          lon: parseFloat(ruta.lon) || -117.018443,
           fotos: ["/images/default-trail.jpg"],
           descripcion: ruta.descripcion || "Descripción no disponible",
           recomendaciones: ruta.recomendaciones || "Recomendaciones no disponibles",
           nivel_experiencia: ruta.nivel_experiencia || "Intermedio"
         }));
-        
+
         setTrails(formattedTrails);
         return formattedTrails;
       } else {
         throw new Error('Formato de datos inválido');
       }
-      
+
     } catch (error) {
       console.error('❌ Error obteniendo rutas:', error);
       // Datos de ejemplo como fallback
@@ -98,18 +100,18 @@ const TrailDirectory = () => {
     try {
       setLoadingFriends(true);
       console.log('🔄 Obteniendo todos los usuarios...');
-      
+
       const response = await fetch(`http://localhost:8000/trail/agendar/mis-amigos/?user_email=${user?.email || ''}`);
-      
+
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
       }
-      
+
       const usersData = await response.json();
       console.log('✅ Usuarios obtenidos:', usersData);
-      
+
       setFriends(usersData || []);
-      
+
     } catch (error) {
       console.error('❌ Error obteniendo usuarios:', error);
       setFriends([]);
@@ -145,7 +147,7 @@ const TrailDirectory = () => {
 
       // Importar Leaflet
       const L = await import('leaflet');
-      
+
       // Configurar iconos por defecto
       delete L.Icon.Default.prototype._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -162,8 +164,8 @@ const TrailDirectory = () => {
       // Crear nuevo mapa con timeout para asegurar que el DOM esté listo
       setTimeout(() => {
         try {
-          mapInstanceRef.current = L.map(mapRef.current).setView([25.6345, -100.5528], 10);
-          
+          mapInstanceRef.current = L.map(mapRef.current).setView([32.525045, -117.018443], 10);
+
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
           }).addTo(mapInstanceRef.current);
@@ -214,12 +216,12 @@ const TrailDirectory = () => {
       console.log('🔑 Configurando autenticación...');
       const auth0Token = await getAccessTokenSilently();
       console.log('✅ Token Auth0 obtenido (para futuros usos)');
-      
+
       setDrfToken(auth0Token);
       localStorage.setItem('drf_token', auth0Token);
-      
+
       return auth0Token;
-      
+
     } catch (error) {
       console.error('❌ Error obteniendo token:', error);
       throw error;
@@ -286,7 +288,7 @@ const TrailDirectory = () => {
   const enviarCitaAlBackend = async (appointmentData) => {
     try {
       console.log('📤 Enviando cita al backend...');
-      
+
       // Agregar el email del usuario y los amigos seleccionados
       const dataConUsuario = {
         ...appointmentData,
@@ -351,6 +353,39 @@ const TrailDirectory = () => {
     loadTrails();
   }, []);
 
+  // ✅ Auto-seleccionar ruta si viene desde RutasSenderismo (query params lat/lon o id)
+  useEffect(() => {
+    if (trails.length > 0) {
+      const paramId = searchParams.get('id');
+      const paramLat = searchParams.get('lat');
+      const paramLon = searchParams.get('lon');
+
+      let matchedTrail = null;
+
+      // Buscar por ID primero (más preciso)
+      if (paramId) {
+        matchedTrail = trails.find(t => t.id === parseInt(paramId));
+      }
+
+      // Si no encuentra por ID, buscar por proximidad lat/lon
+      if (!matchedTrail && paramLat && paramLon) {
+        const targetLat = parseFloat(paramLat);
+        const targetLon = parseFloat(paramLon);
+        const threshold = 0.01; // ~1 km de tolerancia
+
+        matchedTrail = trails.find(t =>
+          Math.abs(t.lat - targetLat) < threshold &&
+          Math.abs(t.lon - targetLon) < threshold
+        );
+      }
+
+      // Auto-seleccionar la ruta encontrada
+      if (matchedTrail && !selectedTrail) {
+        handleTrailSelect(matchedTrail);
+      }
+    }
+  }, [trails, searchParams, selectedTrail]);
+
   // ✅ Cargar TODOS los usuarios cuando el usuario se autentique
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -361,13 +396,13 @@ const TrailDirectory = () => {
   // Manejar selección de ruta
   const handleTrailSelect = async (trail) => {
     setSelectedTrail(trail);
-    
+
     const weather = await fetchWeather(trail.lat, trail.lon);
     setWeatherData(weather);
-    
+
     const hourly = await fetchHourlyWeather(trail.lat, trail.lon);
     setHourlyWeather(hourly);
-    
+
     if (mapInstanceRef.current) {
       mapInstanceRef.current.setView([trail.lat, trail.lon], 12);
     }
@@ -400,7 +435,7 @@ const TrailDirectory = () => {
 
     const weatherInfo = interpretWeatherCode(hourlyWeather.weathercode[closestIndex]);
     const temp = hourlyWeather.temperature_2m[closestIndex];
-    
+
     setSelectedHourlyWeather({
       text: `${weatherInfo.text}, Temp: ${temp}°C`,
       icon: weatherInfo.icon
@@ -440,20 +475,20 @@ const TrailDirectory = () => {
       console.log('📝 Datos de la cita:', appointmentData);
 
       await enviarCitaAlBackend(appointmentData);
-      
+
       // Mensaje personalizado según si hay amigos invitados
-      const mensaje = selectedFriends.length > 0 
-        ? `✅ Cita agendada correctamente con ${selectedFriends.length} amigo(s)!` 
+      const mensaje = selectedFriends.length > 0
+        ? `✅ Cita agendada correctamente con ${selectedFriends.length} amigo(s)!`
         : "✅ Cita agendada correctamente!";
-      
+
       alert(mensaje);
-      
+
       // Resetear formulario
       setSelectedDateTime({ date: '', time: '' });
       setSelectedHourlyWeather(null);
       setSelectedFriends([]);
       setShowFriendSelector(false);
-      
+
     } catch (err) {
       console.error('❌ Error al agendar cita:', err);
       alert(`❌ Error al agendar cita: ${err.message}`);
@@ -466,8 +501,8 @@ const TrailDirectory = () => {
     <div>
       {/* Header reducido */}
       <div className='py-2 px-4' style={{ marginBottom: '1.5rem' }}>
-        <h1 className='text-start my-2' style={{ 
-          fontFamily: 'Kalam, cursive', 
+        <h1 className='text-start my-2' style={{
+          fontFamily: 'Kalam, cursive',
           color: '#388e3c',
           fontWeight: '700',
           fontSize: '2rem',
@@ -475,7 +510,7 @@ const TrailDirectory = () => {
         }}>
           Mapa de Rutas
         </h1>
-        <p className='text-start' style={{ 
+        <p className='text-start' style={{
           color: '#1b1b1b',
           fontWeight: '500',
           marginBottom: '0.5rem',
@@ -483,8 +518,8 @@ const TrailDirectory = () => {
         }}>
           {loadingTrails ? 'Cargando rutas...' : `Selecciona una de las ${trails.length} rutas disponibles`}
         </p>
-        <hr style={{ 
-          borderColor: '#c2a200', 
+        <hr style={{
+          borderColor: '#c2a200',
           opacity: 0.5,
           margin: '0.5rem 0'
         }} />
@@ -494,11 +529,11 @@ const TrailDirectory = () => {
         <Row>
           <Col className="p-0">
             <div className="container-mapa">
-              <div 
-                ref={mapRef} 
-                id="map" 
-                style={{ 
-                  height: 'calc(100vh - 150px)', 
+              <div
+                ref={mapRef}
+                id="map"
+                style={{
+                  height: 'calc(100vh - 150px)',
                   width: '70%',
                   zIndex: 1,
                   borderRadius: '12px',
@@ -506,9 +541,9 @@ const TrailDirectory = () => {
                   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
                 }}
               />
-              
-              <div 
-                id="detalleRuta" 
+
+              <div
+                id="detalleRuta"
                 className="panel-ruta"
                 style={{
                   width: '30%',
@@ -523,15 +558,15 @@ const TrailDirectory = () => {
                 }}
               >
                 {loadingTrails ? (
-                  <div style={{ 
-                    textAlign: 'center', 
+                  <div style={{
+                    textAlign: 'center',
                     padding: '30px 16px',
                     color: '#1b1b1b'
                   }}>
                     <div className="spinner-border text-success" role="status">
                       <span className="visually-hidden">Cargando...</span>
                     </div>
-                    <p style={{ 
+                    <p style={{
                       marginTop: '12px',
                       color: '#666',
                       fontWeight: '500'
@@ -541,8 +576,8 @@ const TrailDirectory = () => {
                   </div>
                 ) : selectedTrail ? (
                   <>
-                    <h2 style={{ 
-                      fontFamily: 'Kalam, cursive', 
+                    <h2 style={{
+                      fontFamily: 'Kalam, cursive',
                       color: '#388e3c',
                       marginBottom: '12px',
                       fontWeight: '700',
@@ -550,11 +585,11 @@ const TrailDirectory = () => {
                     }}>
                       {selectedTrail.nombre}
                     </h2>
-                    
+
                     {selectedTrail.fotos.map((foto, index) => (
-                      <img 
+                      <img
                         key={index}
-                        src={foto} 
+                        src={foto}
                         alt={selectedTrail.nombre}
                         style={{
                           width: '100%',
@@ -564,10 +599,10 @@ const TrailDirectory = () => {
                         }}
                       />
                     ))}
-                    
+
                     <div className="contenido">
                       <div className="info" style={{ marginBottom: '12px' }}>
-                        <p style={{ 
+                        <p style={{
                           color: '#1b1b1b',
                           lineHeight: '1.5',
                           fontWeight: '500',
@@ -576,7 +611,7 @@ const TrailDirectory = () => {
                         }}>
                           <b style={{ color: '#2e7d32', fontWeight: '600' }}>Descripción:</b> {selectedTrail.descripcion}
                         </p>
-                        <p style={{ 
+                        <p style={{
                           color: '#1b1b1b',
                           lineHeight: '1.5',
                           fontWeight: '500',
@@ -584,7 +619,7 @@ const TrailDirectory = () => {
                         }}>
                           <b style={{ color: '#2e7d32', fontWeight: '600' }}>Nivel de experiencia:</b> {selectedTrail.nivel_experiencia}
                         </p>
-                        <p style={{ 
+                        <p style={{
                           color: '#1b1b1b',
                           lineHeight: '1.5',
                           fontWeight: '500',
@@ -593,7 +628,7 @@ const TrailDirectory = () => {
                           <b style={{ color: '#2e7d32', fontWeight: '600' }}>Recomendaciones:</b> {selectedTrail.recomendaciones}
                         </p>
                       </div>
-                      
+
                       {weatherData && (
                         <div className="clima-box" style={{
                           background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
@@ -602,18 +637,18 @@ const TrailDirectory = () => {
                           border: '1px solid #dee2e6',
                           marginBottom: '12px'
                         }}>
-                          <img 
-                            className="clima-icon" 
-                            src={weatherData.descripcion.icon} 
+                          <img
+                            className="clima-icon"
+                            src={weatherData.descripcion.icon}
                             alt="icono"
-                            style={{ 
-                              width: '40px', 
+                            style={{
+                              width: '40px',
                               height: '40px',
                               filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))'
                             }}
                           />
                           <div style={{ marginLeft: '10px' }}>
-                            <p style={{ 
+                            <p style={{
                               margin: '0 0 4px 0',
                               color: '#1b1b1b',
                               fontWeight: '500',
@@ -621,7 +656,7 @@ const TrailDirectory = () => {
                             }}>
                               <b style={{ color: '#2e7d32', fontWeight: '600' }}>Clima:</b> {weatherData.descripcion.text}
                             </p>
-                            <p style={{ 
+                            <p style={{
                               margin: '0 0 4px 0',
                               color: '#1b1b1b',
                               fontWeight: '500',
@@ -629,7 +664,7 @@ const TrailDirectory = () => {
                             }}>
                               <b style={{ color: '#2e7d32', fontWeight: '600' }}>Temperatura:</b> {weatherData.temperatura}°C
                             </p>
-                            <p style={{ 
+                            <p style={{
                               margin: '0',
                               color: '#1b1b1b',
                               fontWeight: '500',
@@ -641,7 +676,7 @@ const TrailDirectory = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Sección del formulario */}
                     <div style={{
                       background: 'linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%)',
@@ -650,7 +685,7 @@ const TrailDirectory = () => {
                       border: '1px solid #e0e0e0',
                       marginTop: '16px'
                     }}>
-                      <p style={{ 
+                      <p style={{
                         color: '#1b1b1b',
                         fontWeight: '600',
                         marginBottom: '12px',
@@ -658,15 +693,15 @@ const TrailDirectory = () => {
                       }}>
                         Consultar clima por fecha/hora:
                       </p>
-                      
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
+
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         gap: '8px',
                         marginBottom: '12px'
                       }}>
-                        <input 
-                          type="date" 
+                        <input
+                          type="date"
                           id="fechaClima"
                           value={selectedDateTime.date}
                           onChange={(e) => setSelectedDateTime(prev => ({
@@ -687,8 +722,8 @@ const TrailDirectory = () => {
                           onFocus={(e) => e.target.style.borderColor = '#2e7d32'}
                           onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
                         />
-                        <input 
-                          type="time" 
+                        <input
+                          type="time"
                           id="horaClima"
                           value={selectedDateTime.time}
                           onChange={(e) => setSelectedDateTime(prev => ({
@@ -710,8 +745,8 @@ const TrailDirectory = () => {
                           onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
                         />
                       </div>
-                      
-                      <button 
+
+                      <button
                         id="verClimaHora"
                         onClick={handleWeatherCheck}
                         style={{
@@ -732,9 +767,9 @@ const TrailDirectory = () => {
                       >
                         Ver clima
                       </button>
-                      
+
                       {selectedHourlyWeather && (
-                        <div id="climaSeleccionado" style={{ 
+                        <div id="climaSeleccionado" style={{
                           marginTop: '12px',
                           animation: 'fadeIn 0.5s ease-in'
                         }}>
@@ -746,17 +781,17 @@ const TrailDirectory = () => {
                             display: 'flex',
                             alignItems: 'center'
                           }}>
-                            <img 
-                              className="clima-icon" 
-                              src={selectedHourlyWeather.icon} 
+                            <img
+                              className="clima-icon"
+                              src={selectedHourlyWeather.icon}
                               alt="icono"
-                              style={{ 
-                                width: '35px', 
+                              style={{
+                                width: '35px',
                                 height: '35px',
                                 marginRight: '10px'
                               }}
                             />
-                            <p style={{ 
+                            <p style={{
                               margin: '0',
                               color: '#1b1b1b',
                               fontWeight: '600',
@@ -783,7 +818,7 @@ const TrailDirectory = () => {
                         alignItems: 'center',
                         marginBottom: '12px'
                       }}>
-                        <p style={{ 
+                        <p style={{
                           color: '#1b1b1b',
                           fontWeight: '600',
                           margin: '0',
@@ -791,7 +826,7 @@ const TrailDirectory = () => {
                         }}>
                           Invitar compañeros:
                         </p>
-                        <button 
+                        <button
                           onClick={() => setShowFriendSelector(!showFriendSelector)}
                           style={{
                             backgroundColor: 'transparent',
@@ -835,7 +870,7 @@ const TrailDirectory = () => {
                             </div>
                           ) : friends.length > 0 ? (
                             friends.map(friend => (
-                              <div 
+                              <div
                                 key={friend.id}
                                 style={{
                                   display: 'flex',
@@ -894,8 +929,8 @@ const TrailDirectory = () => {
                         </div>
                       )}
                     </div>
-                    
-                    <button 
+
+                    <button
                       id="agendarCita"
                       onClick={handleScheduleAppointment}
                       disabled={isLoading || !drfToken}
@@ -929,28 +964,28 @@ const TrailDirectory = () => {
                     </button>
 
                     {!drfToken && isAuthenticated && (
-                      <p style={{ 
-                        color: '#dc3545', 
-                        fontSize: '0.8rem', 
+                      <p style={{
+                        color: '#dc3545',
+                        fontSize: '0.8rem',
                         textAlign: 'center',
                         marginTop: '8px'
                       }}>
                         Problema de autenticación. Recarga la página.
                       </p>
                     )}
-                     <ReviewsSection 
-        trailId={selectedTrail.id} 
-        trailName={selectedTrail.nombre} 
-      />
+                    <ReviewsSection
+                      trailId={selectedTrail.id}
+                      trailName={selectedTrail.nombre}
+                    />
                   </>
                 ) : (
-                  <div style={{ 
-                    textAlign: 'center', 
+                  <div style={{
+                    textAlign: 'center',
                     padding: '30px 16px',
                     color: '#1b1b1b'
                   }}>
-                    <h2 style={{ 
-                      fontFamily: 'Kalam, cursive', 
+                    <h2 style={{
+                      fontFamily: 'Kalam, cursive',
                       color: '#388e3c',
                       marginBottom: '12px',
                       fontWeight: '700',
@@ -958,14 +993,14 @@ const TrailDirectory = () => {
                     }}>
                       {trails.length > 0 ? 'Selecciona una ruta' : 'No hay rutas disponibles'}
                     </h2>
-                    <p style={{ 
+                    <p style={{
                       color: '#666',
                       fontStyle: 'italic',
                       fontWeight: '500',
                       fontSize: '0.9rem'
                     }}>
-                      {trails.length > 0 
-                        ? 'Haz clic en cualquier marcador del mapa para ver los detalles de la ruta' 
+                      {trails.length > 0
+                        ? 'Haz clic en cualquier marcador del mapa para ver los detalles de la ruta'
                         : 'No se pudieron cargar las rutas. Intenta recargar la página.'}
                     </p>
                   </div>

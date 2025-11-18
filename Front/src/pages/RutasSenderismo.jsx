@@ -1,86 +1,188 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { rutasService } from '../services';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css'; // Importar los iconos
 
 export const RutasSenderismo = () => {
     // Estado para controlar la vista (cards o lista)
     const [vista, setVista] = useState('cards');
+    const [rutas, setRutas] = useState([]);
+    const [allRutas, setAllRutas] = useState([]); // copia completa para filtrar localmente
+    const [searchQuery, setSearchQuery] = useState('');
+    const debounceRef = useRef(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Datos de ejemplo de rutas de senderismo
-    const [rutas, setRutas] = useState([
-        {
-            id: 1,
-            nombre: 'Ruta del Cares',
-            ubicacion: 'Picos de Europa, Asturias',
-            distancia: '12 km',
-            duracion: '4-5 horas',
-            dificultad: 'Media',
-            descripcion: 'Conocida como la "Garganta Divina", es una de las rutas más espectaculares de los Picos de Europa.',
-            imagen: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400',
-            altitud: '800 m',
-            tipo: 'Lineal'
-        },
-        {
-            id: 2,
-            nombre: 'Camino de Santiago Francés',
-            ubicacion: 'Pirineos a Santiago de Compostela',
-            distancia: '780 km',
-            duracion: '30-35 días',
-            dificultad: 'Alta',
-            descripcion: 'La ruta más famosa del Camino de Santiago, llena de historia y paisajes variados.',
-            imagen: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400',
-            altitud: '1400 m',
-            tipo: 'Lineal'
-        },
-        {
-            id: 3,
-            nombre: 'Ruta Circular Lagos de Covadonga',
-            ubicacion: 'Parque Nacional Picos de Europa',
-            distancia: '8 km',
-            duracion: '3 horas',
-            dificultad: 'Fácil',
-            descripcion: 'Paseo circular alrededor de los famosos lagos Enol y Ercina.',
-            imagen: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400',
-            altitud: '1100 m',
-            tipo: 'Circular'
-        },
-        {
-            id: 4,
-            nombre: 'Subida al Mulhacén',
-            ubicacion: 'Sierra Nevada, Granada',
-            distancia: '15 km',
-            duracion: '6-7 horas',
-            dificultad: 'Alta',
-            descripcion: 'Ascensión al pico más alto de la península ibérica con vistas espectaculares.',
-            imagen: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400',
-            altitud: '3479 m',
-            tipo: 'Circular'
+    // Cargar rutas al montar el componente
+    useEffect(() => {
+        cargarRutas();
+    }, []);
+
+    const cargarRutas = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Ejemplo con filtros
+            const filtros = {
+                dificultad: 'media',
+                ordenar: 'nombre'
+            };
+
+            const datosRutas = await rutasService.getRutas(filtros);
+            const parsedRutas = datosRutas.map(ruta => ({
+                //...ruta,
+                id: ruta.id,
+                nombre: ruta.descripcion,
+                ubicacion: ruta.descripcion,
+                distancia: "15 km",
+                duracion: "30 min",
+                dificultad: ruta.nivel_experiencia,
+                descripcion: ruta.descripcion,
+                imagen: ruta.imagen || 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400', // Imagen por defecto si no hay
+                altitud: "800 m",
+                tipo: "Circular"
+            }));
+            setRutas(parsedRutas);
+            setAllRutas(parsedRutas);
+        } catch (err) {
+            setError(err.message);
+            console.error('Error cargando rutas:', err);
+        } finally {
+            setLoading(false);
         }
-    ]);
+    };
+
+    // Filtrar rutas por nombre (case-insensitive) usando la copia completa `allRutas`
+    const filterRutasByName = (query) => {
+        try {
+            if (!query || typeof query !== 'string') return allRutas;
+            const q = query.trim().toLowerCase();
+            if (q === '') return allRutas;
+            return allRutas.filter(r => (r.nombre || '').toString().toLowerCase().includes(q));
+        } catch (err) {
+            console.error('Error en filterRutasByName:', err);
+            return allRutas;
+        }
+    };
+    // Función para buscar rutas
+    const buscarRutas = async (query) => {
+        try {
+            setLoading(true);
+            // Intentar usar el servicio si existe; si falla, usar filtrado local
+            if (rutasService && typeof rutasService.searchRutas === 'function') {
+                try {
+                    const resultados = await rutasService.searchRutas(query);
+                    // Si el servicio devuelve resultados válidos, úsalos
+                    if (Array.isArray(resultados)) {
+                        setRutas(resultados);
+                        return;
+                    }
+                } catch (svcErr) {
+                    console.warn('rutasService.searchRutas falló, usando filtro local:', svcErr);
+                }
+            }
+
+            // Fallback: filtrar en el cliente usando la copia completa
+            const resultadosLocal = filterRutasByName(query);
+            setRutas(resultadosLocal);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Función para obtener la clase de color según la dificultad
     const getColorDificultad = (dificultad) => {
         switch (dificultad.toLowerCase()) {
-            case 'fácil':
+            case '1':
                 return 'success';
-            case 'media':
+            case '2':
                 return 'warning';
-            case 'alta':
+            case '3':
                 return 'danger';
             default:
                 return 'secondary';
         }
     };
 
+    const parsedDificultad = (dificultad) => {
+        switch (dificultad.toLowerCase()) {
+            case '1':
+                return 'Facil';
+            case '2':
+                return 'Media';
+            case '3':
+                return 'Dificil';
+            default:
+                return 'Desconocida';
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="container mt-4">
+                <div className="d-flex justify-content-center">
+                    <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+
+    if (error) {
+        return (
+            <div className="container mt-4">
+                <div className="alert alert-danger" role="alert">
+                    <h4 className="alert-heading">Error</h4>
+                    <p>{error}</p>
+                    <button className="btn btn-primary" onClick={cargarRutas}>
+                        Reintentar
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="container mt-4 min-vh-100">
-            {/* Header */}
+
+            {/* Header con búsqueda */}
             <div className="row mb-4">
                 <div className="col">
                     <h1 className="text-center text-primary">Rutas de Senderismo</h1>
-                    <p className="text-center text-muted">
-                        Descubre las mejores rutas para disfrutar de la naturaleza
-                    </p>
+
+                    {/* Barra de búsqueda */}
+                    <div className="input-group mb-3">
+                        <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Buscar rutas..."
+                            value={searchQuery}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setSearchQuery(v);
+                                // Filtrado instantáneo en cliente
+                                setRutas(filterRutasByName(v));
+
+                                // Debounced backend search (opcional)
+                                if (debounceRef.current) clearTimeout(debounceRef.current);
+                                debounceRef.current = setTimeout(() => {
+                                    if (v.trim() !== '') buscarRutas(v);
+                                }, 700);
+                            }}
+                        />
+                        <button
+                            className="btn btn-outline-secondary"
+                            type="button"
+                            onClick={() => buscarRutas(searchQuery)}
+                        >
+                            Buscar
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -121,7 +223,7 @@ export const RutasSenderismo = () => {
                                     <div className="d-flex justify-content-between align-items-start mb-2">
                                         <h5 className="card-title text-primary">{ruta.nombre}</h5>
                                         <span className={`badge bg-${getColorDificultad(ruta.dificultad)}`}>
-                                            {ruta.dificultad}
+                                            {parsedDificultad(ruta.dificultad)}
                                         </span>
                                     </div>
                                     <p className="card-text text-muted small">{ruta.descripcion}</p>
@@ -175,7 +277,7 @@ export const RutasSenderismo = () => {
                                     <div className="d-flex justify-content-between align-items-start">
                                         <h5 className="mb-1 text-primary">{ruta.nombre}</h5>
                                         <span className={`badge bg-${getColorDificultad(ruta.dificultad)}`}>
-                                            {ruta.dificultad}
+                                            {parsedDificultad(ruta.dificultad)}
                                         </span>
                                     </div>
                                     <p className="mb-1 text-muted small">{ruta.descripcion}</p>

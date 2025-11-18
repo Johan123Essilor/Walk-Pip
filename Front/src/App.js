@@ -13,6 +13,7 @@ import { fetchTrails } from './features/trails/trailsSlice';
 import UserProfile from './pages/UserProfile';
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import { RutasSenderismo } from './pages/RutasSenderismo';
 
 function App() {
   const dispatch = useDispatch();
@@ -25,13 +26,14 @@ function App() {
     <div className="App">
       <Header />
       <Routes>
-        <Route path='/' element={ <HomePage /> } />
-        <Route path='/trail-directory' element={ <TrailDirectory /> } />
-        <Route path='/trail-directory/:id' element={ <TrailDetailPage /> } />
-        <Route path='/contact-us' element={ <ContactPage /> } />
-        <Route path='/safety' element={ <SafetyPage /> } />
-        <Route path='/about-us' element={ <AboutPage /> } />
-        <Route path='/user-profile' element={ <UserProfile /> } />
+        <Route path='/' element={<HomePage />} />
+        <Route path='/trail-directory' element={<TrailDirectory />} />
+        <Route path='/trail-directory/:id' element={<TrailDetailPage />} />
+        <Route path='/contact-us' element={<ContactPage />} />
+        <Route path='/safety' element={<SafetyPage />} />
+        <Route path='/about-us' element={<AboutPage />} />
+        <Route path='/user-profile' element={<UserProfile />} />
+        <Route path='/list-routes' element={<RutasSenderismo />} />
       </Routes >
       <Footer />
     </div>

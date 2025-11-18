@@ -1,6 +1,8 @@
 // src/hooks/useUserSync.js - VERSIÓN SIN TOKEN
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
+// Obtener la URL base desde las variables de entorno
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export const useUserSync = () => {
   const { user, isAuthenticated } = useAuth0(); // ✅ Quitamos getAccessTokenSilently
@@ -25,10 +27,10 @@ export const useUserSync = () => {
       setSyncError(null);
 
       try {
-        console.log('🔄 Sincronizando usuario con Django...', user.email);
+        console.log('Sincronizando usuario con Django...', user.email);
 
         //  SIN TOKEN - solo enviamos los datos básicos
-        const response = await fetch('http://localhost:8000/users/auth0/sync/', {
+        const response = await fetch(`${API_BASE_URL}/users/auth0/sync/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -49,7 +51,7 @@ export const useUserSync = () => {
         }
 
         const userData = await response.json();
-        console.log('✅ Usuario sincronizado exitosamente:', userData);
+        console.log(' Usuario sincronizado exitosamente:', userData);
         
         localStorage.setItem('django_user', JSON.stringify(userData.user || userData));
         setDjangoUser(userData.user || userData);

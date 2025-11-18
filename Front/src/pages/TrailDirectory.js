@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Container, Row, Col } from 'reactstrap';
 import { useAuth0 } from '@auth0/auth0-react';
 import ReviewsSection from './ReviewsSection';
+// Obtener la URL base desde las variables de entorno
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 const TrailDirectory = () => {
   const [selectedTrail, setSelectedTrail] = useState(null);
@@ -32,7 +34,7 @@ const TrailDirectory = () => {
   const fetchTrailsFromBackend = async () => {
     try {
       console.log('🔄 Obteniendo rutas desde el backend...');
-      const response = await fetch('http://localhost:8000/trail/rutas/');
+      const response = await fetch(`${API_BASE_URL}/trail/rutas/`);
       
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
@@ -99,7 +101,7 @@ const TrailDirectory = () => {
       setLoadingFriends(true);
       console.log('🔄 Obteniendo todos los usuarios...');
       
-      const response = await fetch(`http://localhost:8000/trail/agendar/mis-amigos/?user_email=${user?.email || ''}`);
+      const response = await fetch(`${API_BASE_URL}/trail/agendar/mis-amigos/?user_email=${user?.email || ''}`);
       
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
@@ -199,12 +201,12 @@ const TrailDirectory = () => {
           console.log('🗺️ Mapa inicializado con', rutas.length, 'rutas');
 
         } catch (mapError) {
-          console.error('❌ Error creando el mapa:', mapError);
+          console.error(' Error creando el mapa:', mapError);
         }
       }, 500);
 
     } catch (error) {
-      console.error('❌ Error loading Leaflet:', error);
+      console.error(' Error loading Leaflet:', error);
     }
   };
 
@@ -296,7 +298,7 @@ const TrailDirectory = () => {
 
       console.log('📝 Datos completos:', dataConUsuario);
 
-      const response = await fetch('http://localhost:8000/trail/agendar/', {
+      const response = await fetch(`${API_BASE_URL}/trail/agendar/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -306,16 +308,16 @@ const TrailDirectory = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ Error del backend:', errorData);
+        console.error('Error del backend:', errorData);
         throw new Error(errorData.detail || JSON.stringify(errorData));
       }
 
       const responseData = await response.json();
-      console.log('✅ Cita creada exitosamente:', responseData);
+      console.log(' Cita creada exitosamente:', responseData);
       return responseData;
 
     } catch (error) {
-      console.error('❌ Error enviando cita:', error);
+      console.error(' Error enviando cita:', error);
       throw error;
     }
   };
@@ -328,12 +330,12 @@ const TrailDirectory = () => {
           const savedToken = localStorage.getItem('drf_token');
           if (savedToken) {
             setDrfToken(savedToken);
-            console.log('✅ Usando token guardado');
+            console.log(' Usando token guardado');
           } else {
             await obtenerTokenJWT();
           }
         } catch (error) {
-          console.error('❌ Error inicializando autenticación:', error);
+          console.error(' Error inicializando autenticación:', error);
         }
       }
     };
@@ -341,7 +343,7 @@ const TrailDirectory = () => {
     initializeAuth();
   }, [isAuthenticated, user]);
 
-  // ✅ Cargar rutas cuando el componente se monte
+  //  Cargar rutas cuando el componente se monte
   useEffect(() => {
     const loadTrails = async () => {
       const rutas = await fetchTrailsFromBackend();
@@ -351,7 +353,7 @@ const TrailDirectory = () => {
     loadTrails();
   }, []);
 
-  // ✅ Cargar TODOS los usuarios cuando el usuario se autentique
+  //  Cargar TODOS los usuarios cuando el usuario se autentique
   useEffect(() => {
     if (isAuthenticated && user) {
       fetchAllUsers();
@@ -407,10 +409,10 @@ const TrailDirectory = () => {
     });
   };
 
-  // ✅ Manejar agendamiento de cita ACTUALIZADO
+  //  Manejar agendamiento de cita ACTUALIZADO
   const handleScheduleAppointment = async () => {
     if (!isAuthenticated) {
-      alert("⚠️ Primero debes iniciar sesión antes de agendar una cita.");
+      alert(" Primero debes iniciar sesión antes de agendar una cita.");
       loginWithRedirect();
       return;
     }
@@ -437,14 +439,14 @@ const TrailDirectory = () => {
         compania: null
       };
 
-      console.log('📝 Datos de la cita:', appointmentData);
+      console.log(' Datos de la cita:', appointmentData);
 
       await enviarCitaAlBackend(appointmentData);
       
       // Mensaje personalizado según si hay amigos invitados
       const mensaje = selectedFriends.length > 0 
-        ? `✅ Cita agendada correctamente con ${selectedFriends.length} amigo(s)!` 
-        : "✅ Cita agendada correctamente!";
+        ? ` Cita agendada correctamente con ${selectedFriends.length} amigo(s)!` 
+        : " Cita agendada correctamente!";
       
       alert(mensaje);
       
@@ -455,8 +457,8 @@ const TrailDirectory = () => {
       setShowFriendSelector(false);
       
     } catch (err) {
-      console.error('❌ Error al agendar cita:', err);
-      alert(`❌ Error al agendar cita: ${err.message}`);
+      console.error(' Error al agendar cita:', err);
+      alert(` Error al agendar cita: ${err.message}`);
     } finally {
       setIsLoading(false);
     }

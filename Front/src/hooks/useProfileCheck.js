@@ -1,6 +1,8 @@
 // src/hooks/useProfileCheck.js
 import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+// Obtener la URL base desde las variables de entorno
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export const useProfileCheck = () => {
   const { user, isAuthenticated } = useAuth0();
@@ -17,7 +19,7 @@ export const useProfileCheck = () => {
       try {
         console.log('🔍 Verificando datos de salud para:', user.email);
         
-        const response = await fetch('http://localhost:8000/users/salud/mis_datos/', {
+        const response = await fetch(`${API_BASE_URL}/users/salud/mis_datos/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

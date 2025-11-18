@@ -3,6 +3,9 @@ import { Card, CardBody, Form, FormGroup, Label, Input, Button, Alert, Spinner, 
 import { useAuth0 } from '@auth0/auth0-react';
 import StarRating from '../components/StarRating';
 
+// Obtener la URL base desde las variables de entorno
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
 const ReviewsSection = ({ trailId, trailName }) => {
   const [reviews, setReviews] = useState([]);
   const [userReview, setUserReview] = useState(null);
@@ -24,7 +27,7 @@ const ReviewsSection = ({ trailId, trailName }) => {
     
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/users/reviews/?ruta=${trailId}`);
+      const response = await fetch(`${API_BASE_URL}/users/reviews/?ruta=${trailId}`);
       
       if (!response.ok) {
         throw new Error('Error al cargar reseñas');
@@ -63,7 +66,7 @@ const ReviewsSection = ({ trailId, trailName }) => {
     if (!isAuthenticated || !user?.email) return;
     
     try {
-      const response = await fetch('http://localhost:8000/users/reviews/mis_reviews/', {
+      const response = await fetch(`${API_BASE_URL}/users/reviews/mis_reviews/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,8 +121,8 @@ const ReviewsSection = ({ trailId, trailName }) => {
     try {
       const method = userReview ? 'PUT' : 'POST';
       const url = userReview 
-        ? `http://localhost:8000/users/reviews/${userReview.id}/`
-        : 'http://localhost:8000/users/reviews/';
+        ? `${API_BASE_URL}/users/reviews/${userReview.id}/`
+        : `${API_BASE_URL}/users/reviews/`;
 
       // ✅ PAYLOAD ACTUALIZADO - usa user_email igual que CitaViewSet
       const reviewData = {
@@ -185,7 +188,7 @@ const ReviewsSection = ({ trailId, trailName }) => {
         user_email: user.email // ← ✅ CAMBIADO de 'email' a 'user_email'
       };
 
-      const response = await fetch(`http://localhost:8000/users/reviews/${userReview.id}/`, {
+      const response = await fetch(`${API_BASE_URL}/users/reviews/${userReview.id}/`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
@@ -197,7 +200,7 @@ const ReviewsSection = ({ trailId, trailName }) => {
         throw new Error('Error al eliminar reseña');
       }
 
-      setSuccess('🗑️ Reseña eliminada');
+      setSuccess('Reseña eliminada');
       setUserReview(null);
       setReviewForm({
         rating: 0,

@@ -6,10 +6,12 @@ import {
 } from 'reactstrap';
 import { useAuth0 } from '@auth0/auth0-react';
 
+// Obtener la URL base desde las variables de entorno
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
 const ProfileOnboarding = ({ onComplete }) => {
   const { user } = useAuth0();
   const [formData, setFormData] = useState({
-    edad: '',
     peso: '',
     altura: '',
     detalle: ''
@@ -24,7 +26,7 @@ const ProfileOnboarding = ({ onComplete }) => {
   useEffect(() => {
     const fetchConditions = async () => {
       try {
-        const response = await fetch('http://localhost:8000/users/condicion/');
+        const response = await fetch(`${API_BASE_URL}/users/condicion/`);
         if (response.ok) {
           const data = await response.json();
           setConditions(data);
@@ -55,8 +57,8 @@ const ProfileOnboarding = ({ onComplete }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.edad || !formData.peso || !formData.altura) {
-      setError('Por favor completa los campos requeridos (edad, peso, altura)');
+    if (!formData.peso || !formData.altura) {
+      setError('Por favor completa los campos requeridos ( peso, altura)');
       return;
     }
 
@@ -66,14 +68,13 @@ const ProfileOnboarding = ({ onComplete }) => {
 
     try {
       // 1. Guardar datos de salud
-      const saludResponse = await fetch('http://localhost:8000/users/salud/', {
+      const saludResponse = await fetch(`${API_BASE_URL}/users/salud/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           user_email: user.email,
-          edad: parseInt(formData.edad),
           peso: parseFloat(formData.peso),
           altura: parseFloat(formData.altura),
           detalle: formData.detalle || ''
@@ -88,7 +89,7 @@ const ProfileOnboarding = ({ onComplete }) => {
       // 2. Guardar condiciones médicas seleccionadas usando el nuevo endpoint
       if (selectedConditions.length > 0) {
         for (const conditionId of selectedConditions) {
-          const usuarioCondicionResponse = await fetch('http://localhost:8000/users/usuario-condiciones/', {
+          const usuarioCondicionResponse = await fetch(`${API_BASE_URL}/users/usuario-condiciones/`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -104,7 +105,7 @@ const ProfileOnboarding = ({ onComplete }) => {
             const errorData = await usuarioCondicionResponse.json();
             console.error('Detalles del error:', errorData);
           } else {
-            console.log('✅ Condición guardada:', conditionId);
+            console.log(' Condición guardada:', conditionId);
           }
         }
       }
@@ -113,7 +114,7 @@ const ProfileOnboarding = ({ onComplete }) => {
       
       // Esperar un poco y luego notificar completado
       setTimeout(() => {
-        console.log('🎯 Notificando completado del onboarding');
+        console.log(' Notificando completado del onboarding');
         onComplete();
       }, 1500);
 
@@ -132,7 +133,7 @@ const ProfileOnboarding = ({ onComplete }) => {
           <Card className="shadow-lg border-0">
             <CardBody className="p-5">
               <div className="text-center mb-4">
-                <h2 className="text-success mb-3">¡Completa tu Perfil de Salud! 🏥</h2>
+                <h2 className="text-success mb-3">¡Completa tu Perfil de Salud! </h2>
                 <p className="text-muted">
                   Esta información nos ayuda a recomendarte rutas seguras y personalizadas
                 </p>
@@ -147,23 +148,9 @@ const ProfileOnboarding = ({ onComplete }) => {
               <Form onSubmit={handleSubmit}>
                 {/* Información Básica de Salud */}
                 <div className="mb-4">
-                  <h5 className="text-success mb-3">📊 Información Básica</h5>
+                  <h5 className="text-success mb-3"> Información Básica</h5>
                   <Row>
                     <Col md={4}>
-                      <FormGroup>
-                        <Label for="edad" className="fw-bold">Edad *</Label>
-                        <Input
-                          type="number"
-                          name="edad"
-                          id="edad"
-                          placeholder="Ej: 25"
-                          value={formData.edad}
-                          onChange={handleInputChange}
-                          min="1"
-                          max="120"
-                          required
-                        />
-                      </FormGroup>
                     </Col>
                     <Col md={4}>
                       <FormGroup>
@@ -216,7 +203,7 @@ const ProfileOnboarding = ({ onComplete }) => {
 
                 {/* Condiciones Médicas */}
                 <div className="mb-4">
-                  <h5 className="text-success mb-3">🏥 Condiciones Médicas (Opcional)</h5>
+                  <h5 className="text-success mb-3">Condiciones Médicas (Opcional)</h5>
                   
                   {conditions.length > 0 ? (
                     <Row>

@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny  # ← Cambiado
 from django.db.models import Q
 from .models import Grupo, UsuarioGrupo
 from .serializers import (
@@ -16,7 +16,7 @@ class GrupoViewSet(viewsets.ModelViewSet):
     ViewSet principal para la gestión de grupos e interacciones entre usuarios.
     """
     serializer_class = GrupoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # ← Cambiado
 
     # --------------------------
     # SERIALIZADOR DINÁMICO
@@ -43,20 +43,46 @@ class GrupoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return Grupo.objects.none()
-        # Usuario puede ver grupos donde es miembro o creador
-        return Grupo.objects.filter(
-            Q(creador=self.request.user) |
-            Q(usuariogrupo__usuario=self.request.user)
-        ).distinct()
+        
+        user_email = self.request.data.get('user_email') or self.request.query_params.get('user_email')
+        if not user_email:
+            return Grupo.objects.none()
+
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            # Usuario puede ver grupos donde es miembro o creador
+            return Grupo.objects.filter(
+                Q(creador=usuario) |
+                Q(usuariogrupo__usuario=usuario)
+            ).distinct()
+        except Usuario.DoesNotExist:
+            return Grupo.objects.none()
+
+    # --------------------------
+    # OBTENER USUARIO POR EMAIL
+    # --------------------------
+    def get_usuario_from_request(self):
+        """Obtiene el usuario basado en user_email"""
+        user_email = self.request.data.get('user_email') or self.request.query_params.get('user_email')
+        if not user_email:
+            return None
+        try:
+            return Usuario.objects.get(correo=user_email)
+        except Usuario.DoesNotExist:
+            return None
 
     # --------------------------
     # CREACIÓN DE GRUPO
     # --------------------------
     def perform_create(self, serializer):
-        grupo = serializer.save(creador=self.request.user)
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            raise ValidationError({"error": "user_email es requerido"})
+        
+        grupo = serializer.save(creador=usuario)
         # El creador se agrega automáticamente como administrador
         UsuarioGrupo.objects.create(
-            usuario=self.request.user,
+            usuario=usuario,
             grupo=grupo,
             rol='Creador',
             aceptado=True
@@ -66,8 +92,15 @@ class GrupoViewSet(viewsets.ModelViewSet):
     # ACTUALIZAR / ELIMINAR
     # --------------------------
     def update(self, request, *args, **kwargs):
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         instance = self.get_object()
-        if instance.creador != request.user:
+        if instance.creador != usuario:
             return Response(
                 {'error': 'Solo el creador del grupo puede actualizarlo'},
                 status=status.HTTP_403_FORBIDDEN
@@ -75,8 +108,15 @@ class GrupoViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         instance = self.get_object()
-        if instance.creador != request.user:
+        if instance.creador != usuario:
             return Response(
                 {'error': 'Solo el creador del grupo puede eliminarlo'},
                 status=status.HTTP_403_FORBIDDEN
@@ -87,10 +127,20 @@ class GrupoViewSet(viewsets.ModelViewSet):
     # ENDPOINTS PERSONALIZADOS
     # --------------------------
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['post'])
     def all(self, request):
         """Listar grupos del usuario"""
-        grupos = self.get_queryset()
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        grupos = Grupo.objects.filter(
+            Q(creador=usuario) | Q(usuariogrupo__usuario=usuario)
+        ).distinct()
+        
         serializer = self.get_serializer(grupos, many=True)
         return Response(serializer.data)
 
@@ -98,13 +148,19 @@ class GrupoViewSet(viewsets.ModelViewSet):
     def invite_multiple(self, request, pk=None):
         """
         Invitar múltiples usuarios al grupo.
-        Solo requiere `usuarios_ids` y `rol`.
         """
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         grupo = self.get_object()
 
         # Solo administradores o creadores pueden invitar
         if not UsuarioGrupo.objects.filter(
-            usuario=request.user, grupo=grupo, rol__in=['Administrador', 'Creador']
+            usuario=usuario, grupo=grupo, rol__in=['Administrador', 'Creador']
         ).exists():
             return Response(
                 {'error': 'Solo los administradores pueden invitar usuarios'},
@@ -124,23 +180,23 @@ class GrupoViewSet(viewsets.ModelViewSet):
 
         for usuario_id in usuarios_ids:
             try:
-                usuario = Usuario.objects.get(id=usuario_id)
+                usuario_invitado = Usuario.objects.get(id=usuario_id)
 
-                if UsuarioGrupo.objects.filter(usuario=usuario, grupo=grupo).exists():
+                if UsuarioGrupo.objects.filter(usuario=usuario_invitado, grupo=grupo).exists():
                     resultados['ya_eran_miembros'].append(usuario_id)
                     continue
 
                 UsuarioGrupo.objects.create(
-                    usuario=usuario,
+                    usuario=usuario_invitado,
                     grupo=grupo,
                     rol=rol,
                     aceptado=False
                 )
 
                 resultados['invitados_exitosos'].append({
-                    'id': usuario.id,
-                    'nombre': usuario.nombre,
-                    'correo': usuario.correo
+                    'id': usuario_invitado.id,
+                    'nombre': usuario_invitado.nombre,
+                    'correo': usuario_invitado.correo
                 })
 
             except Usuario.DoesNotExist:
@@ -148,7 +204,7 @@ class GrupoViewSet(viewsets.ModelViewSet):
 
         return Response(resultados)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['post'])
     def members(self, request, pk=None):
         """Obtener miembros aceptados de un grupo"""
         grupo = self.get_object()
@@ -159,10 +215,17 @@ class GrupoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def schedule_activity(self, request, pk=None):
         """Programar una actividad grupal"""
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         grupo = self.get_object()
 
         if not UsuarioGrupo.objects.filter(
-            usuario=request.user, grupo=grupo, aceptado=True
+            usuario=usuario, grupo=grupo, aceptado=True
         ).exists():
             return Response(
                 {'error': 'Debes ser miembro del grupo para programar actividades'},
@@ -181,10 +244,17 @@ class GrupoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def leave(self, request, pk=None):
         """Abandonar grupo"""
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         grupo = self.get_object()
         try:
-            usuario_grupo = UsuarioGrupo.objects.get(usuario=request.user, grupo=grupo)
-            if grupo.creador == request.user:
+            usuario_grupo = UsuarioGrupo.objects.get(usuario=usuario, grupo=grupo)
+            if grupo.creador == usuario:
                 return Response(
                     {'error': 'El creador no puede abandonar el grupo.'},
                     status=400
@@ -197,10 +267,17 @@ class GrupoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def accept_invitation(self, request, pk=None):
         """Aceptar invitación a grupo"""
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         grupo = self.get_object()
         try:
             usuario_grupo = UsuarioGrupo.objects.get(
-                usuario=request.user, grupo=grupo, aceptado=False
+                usuario=usuario, grupo=grupo, aceptado=False
             )
             usuario_grupo.aceptado = True
             usuario_grupo.save()
@@ -208,19 +285,33 @@ class GrupoViewSet(viewsets.ModelViewSet):
         except UsuarioGrupo.DoesNotExist:
             return Response({'error': 'No tienes invitación pendiente'}, status=404)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['post'])
     def pending_invitations(self, request):
         """Invitaciones pendientes del usuario"""
-        invitaciones = UsuarioGrupo.objects.filter(usuario=request.user, aceptado=False)
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        invitaciones = UsuarioGrupo.objects.filter(usuario=usuario, aceptado=False)
         serializer = UsuarioGrupoSerializer(invitaciones, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['post'])
     def group_pending_invitations(self, request, pk=None):
         """Invitaciones pendientes de un grupo (solo administradores)"""
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         grupo = self.get_object()
         if not UsuarioGrupo.objects.filter(
-            usuario=request.user, grupo=grupo, rol__in=['Administrador', 'Creador']
+            usuario=usuario, grupo=grupo, rol__in=['Administrador', 'Creador']
         ).exists():
             return Response(
                 {'error': 'No tienes permisos para ver las invitaciones'},
@@ -231,18 +322,25 @@ class GrupoViewSet(viewsets.ModelViewSet):
         serializer = UsuarioGrupoSerializer(invitaciones, many=True)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['post'])
     def search_users(self, request):
         """Buscar usuarios (para invitar o mostrar)"""
-        q = request.GET.get('q', '')
-        exclude_group = request.GET.get('exclude_group')
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        q = request.data.get('q', '')
+        exclude_group = request.data.get('exclude_group')
 
         if not q:
             return Response({'error': 'Parámetro q requerido'}, status=400)
 
         usuarios = Usuario.objects.filter(
             Q(nombre__icontains=q) | Q(correo__icontains=q)
-        ).exclude(id=request.user.id)
+        ).exclude(id=usuario.id)
 
         if exclude_group:
             miembros_ids = UsuarioGrupo.objects.filter(
@@ -264,8 +362,15 @@ class GrupoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def transfer_ownership(self, request, pk=None):
         """Transferir propiedad del grupo"""
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         grupo = self.get_object()
-        if grupo.creador != request.user:
+        if grupo.creador != usuario:
             return Response({'error': 'Solo el creador puede transferir'}, status=403)
 
         nuevo_id = request.data.get('nuevo_creador_id')
@@ -282,7 +387,7 @@ class GrupoViewSet(viewsets.ModelViewSet):
             rel.rol = 'Creador'
             rel.save()
 
-            antiguo = UsuarioGrupo.objects.get(usuario=request.user, grupo=grupo)
+            antiguo = UsuarioGrupo.objects.get(usuario=usuario, grupo=grupo)
             antiguo.rol = 'Administrador'
             antiguo.save()
 

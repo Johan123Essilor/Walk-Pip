@@ -72,7 +72,7 @@ def sync_auth0_user(request):
                 user = Usuario.objects.create(
                     nombre=name or email.split('@')[0],
                     correo=email,
-                    tipo_usuario=2,
+                    tipo_usuario_id=2,
                     auth0_id=auth0_id,
                     picture=picture
                 )
@@ -210,21 +210,107 @@ class PerfilView(mixins.RetrieveModelMixin,
                  mixins.ListModelMixin,
                  viewsets.GenericViewSet):
     """
-    ViewSet para gestionar el perfil del usuario autenticado.
+    ViewSet para gestionar el perfil del usuario - VERSIÓN PÚBLICA
     """
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # ← Cambiado de [IsAuthenticated] a [AllowAny]
     
     # Agrega esto para Swagger
     queryset = Usuario.objects.all()
 
     def get_object(self):
-        # Siempre retorna el usuario autenticado, ignora el pk
-        return self.request.user
+        """
+        Obtiene el usuario por email en lugar de por autenticación JWT
+        """
+        user_email = self.request.data.get('user_email') or self.request.query_params.get('user_email')
+        
+        if not user_email:
+            return Response(
+                {"error": "user_email es requerido"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            return Usuario.objects.get(correo=user_email)
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Obtener perfil por email
+        """
+        instance = self.get_object()
+        
+        # Si get_object retorna un Response (error), lo retornamos directamente
+        if isinstance(instance, Response):
+            return instance
+            
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def list(self, request, *args, **kwargs):
-        # Redirige a retrieve para obtener el perfil
+        """
+        Redirige a retrieve para obtener el perfil
+        Requiere user_email en query params
+        """
         return self.retrieve(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Actualizar perfil - validación por email
+        """
+        instance = self.get_object()
+        
+        if isinstance(instance, Response):
+            return instance
+
+        # Validar que el email del perfil coincida con el user_email enviado
+        user_email = request.data.get('user_email')
+        if not user_email:
+            return Response(
+                {"error": "user_email es requerido"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if instance.correo != user_email:
+            return Response(
+                {"error": "Solo puedes actualizar tu propio perfil"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Actualización parcial - misma validación que update
+        """
+        return self.update(request, *args, **kwargs)
+
+    @action(detail=False, methods=['post'])
+    def mi_perfil(self, request):
+        """
+        Endpoint alternativo para obtener perfil por email
+        """
+        user_email = request.data.get('user_email')
+        
+        if not user_email:
+            return Response(
+                {"error": "user_email es requerido"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            serializer = self.get_serializer(usuario)
+            return Response(serializer.data)
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 # --- VIEWSET PARA CONDICIONES (CATÁLOGO) ---
 class CondicionViewSet(mixins.ListModelMixin, 
@@ -234,11 +320,11 @@ class CondicionViewSet(mixins.ListModelMixin,
     """
     Catálogo de condiciones médicas disponibles.
     GET: Lista todas las condiciones
-    POST: Crear nueva condición (asigna automáticamente al usuario autenticado)
+    POST: Crear nueva condición (asigna automáticamente al usuario por email)
     """
     queryset = Condicion.objects.all()
     serializer_class = CondicionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # ← Cambiado
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
@@ -246,10 +332,30 @@ class CondicionViewSet(mixins.ListModelMixin,
         return Condicion.objects.all()
 
     def perform_create(self, serializer):
+        user_email = self.request.data.get('user_email')
+        if not user_email:
+            raise ValidationError({"error": "user_email es requerido"})
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+        except Usuario.DoesNotExist:
+            raise ValidationError({"error": "Usuario no encontrado"})
+        
         condicion = serializer.save()
-        # 🔹 Crear automáticamente la relación con el usuario autenticado
-        UsuarioCondicion.objects.create(usuario=self.request.user, condicion=condicion)
+        # 🔹 Crear automáticamente la relación con el usuario por email
+        UsuarioCondicion.objects.create(usuario=usuario, condicion=condicion)
 
+# En tu views.py
+class UsuarioCondicionViewSet(viewsets.ModelViewSet):
+    serializer_class = UsuarioCondicionSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return UsuarioCondicion.objects.none()
+        return UsuarioCondicion.objects.all()
+
+    # Ya no necesitamos perform_create porque el serializer maneja la creación
 
 # --- VIEWSET PARA SALUD ---
 class SaludViewSet(viewsets.ModelViewSet):
@@ -257,38 +363,71 @@ class SaludViewSet(viewsets.ModelViewSet):
     Permite que el usuario registre y consulte sus datos de salud.
     """
     serializer_class = SaludSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # ← Cambiado
 
     def get_queryset(self):
-        if getattr(self, 'swagger_fake_view', False) or not self.request.user.is_authenticated:
+        if getattr(self, 'swagger_fake_view', False):
             return Salud.objects.none()
 
-        #  Solo el registro del usuario autenticado
-        return Salud.objects.filter(usuario=self.request.user)
+        user_email = self.request.data.get('user_email') or self.request.query_params.get('user_email')
+        if not user_email:
+            return Salud.objects.none()
+
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            return Salud.objects.filter(usuario=usuario)
+        except Usuario.DoesNotExist:
+            return Salud.objects.none()
 
     def perform_create(self, serializer):
-        #  Asocia el registro al usuario autenticado
-        serializer.save(usuario=self.request.user)
+        user_email = self.request.data.get('user_email')
+        if not user_email:
+            raise ValidationError({"error": "user_email es requerido"})
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+        except Usuario.DoesNotExist:
+            raise ValidationError({"error": "Usuario no encontrado"})
+        
+        # Asocia el registro al usuario por email
+        serializer.save(usuario=usuario)
 
     # GET /salud/mis_datos/
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['post'])
     def mis_datos(self, request):
         """
-        Retorna los datos de salud del usuario autenticado.
+        Retorna los datos de salud del usuario por email
         """
-        salud = Salud.objects.filter(usuario=request.user).first()
-        if not salud:
+        user_email = request.data.get('user_email')
+        if not user_email:
             return Response(
-                {"detalle": "No hay datos de salud registrados."},
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            salud = Salud.objects.filter(usuario=usuario).first()
+            
+            if not salud:
+                return Response(
+                    {"detalle": "No hay datos de salud registrados."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            serializer = self.get_serializer(salud)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = self.get_serializer(salud)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class ContactoEmergenciaViewSet(viewsets.ModelViewSet):
     serializer_class = ContactoEmergenciaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # ← Cambiado
     
     # Solo permitir estos métodos
     http_method_names = ['get', 'post', 'put', 'patch']
@@ -296,74 +435,139 @@ class ContactoEmergenciaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return ContactoEmergencia.objects.none()
-        return ContactoEmergencia.objects.filter(usuario=self.request.user)
+
+        user_email = self.request.data.get('user_email') or self.request.query_params.get('user_email')
+        if not user_email:
+            return ContactoEmergencia.objects.none()
+
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            return ContactoEmergencia.objects.filter(usuario=usuario)
+        except Usuario.DoesNotExist:
+            return ContactoEmergencia.objects.none()
 
     def perform_create(self, serializer):
-        serializer.save(usuario=self.request.user)
+        user_email = self.request.data.get('user_email')
+        if not user_email:
+            raise ValidationError({"error": "user_email es requerido"})
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+        except Usuario.DoesNotExist:
+            raise ValidationError({"error": "Usuario no encontrado"})
+        
+        serializer.save(usuario=usuario)
 
     def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if instance.usuario != request.user:
+        user_email = request.data.get('user_email')
+        if not user_email:
             return Response(
-                {'error': 'No puedes actualizar contactos de otros usuarios'},
-                status=status.HTTP_403_FORBIDDEN
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
             )
+
+        instance = self.get_object()
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            if instance.usuario != usuario:
+                return Response(
+                    {'error': 'No puedes actualizar contactos de otros usuarios'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         return super().update(request, *args, **kwargs)
+
 
 class HorarioRetornoViewSet(viewsets.ModelViewSet):
     serializer_class = HorarioRetornoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # ← Cambiado
 
     def get_queryset(self):
         """
-        Retorna los horarios del usuario autenticado,
-        filtrando a través de las citas que le pertenecen.
+        Retorna los horarios del usuario por email
         """
         if getattr(self, 'swagger_fake_view', False):
             return HorarioRetorno.objects.none()
-        return HorarioRetorno.objects.filter(cita__usuario=self.request.user)
+
+        user_email = self.request.data.get('user_email') or self.request.query_params.get('user_email')
+        if not user_email:
+            return HorarioRetorno.objects.none()
+
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            return HorarioRetorno.objects.filter(cita__usuario=usuario)
+        except Usuario.DoesNotExist:
+            return HorarioRetorno.objects.none()
 
     def perform_create(self, serializer):
-        """
-        Crea el horario y genera el historial automáticamente.
-        """
+        user_email = self.request.data.get('user_email')
+        if not user_email:
+            raise ValidationError({"error": "user_email es requerido"})
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+        except Usuario.DoesNotExist:
+            raise ValidationError({"error": "Usuario no encontrado"})
+        
         horario = serializer.save()
 
         # Calcular duración estimada
         duracion_estimada = None
         if horario.hora_inicio and horario.hora_retorno:
+            from datetime import datetime, date
             inicio = datetime.combine(date.today(), horario.hora_inicio)
             fin = datetime.combine(date.today(), horario.hora_retorno)
             duracion_estimada = fin - inicio
 
-       # Buscar si hay historiales previos de esa ruta y usuario
-            historial = HistorialUsuarioRuta.objects.filter(
-                usuario=horario.cita.usuario,
-                ruta=horario.cita.ruta
-            ).last()  # el más reciente, por ejemplo
+        # Buscar si hay historiales previos de esa ruta y usuario
+        historial = HistorialUsuarioRuta.objects.filter(
+            usuario=usuario,
+            ruta=horario.cita.ruta
+        ).last()
 
-            # Si no hay historial previo, lo creas
-            if not historial:
-                historial = HistorialUsuarioRuta.objects.create(
-                    usuario=horario.cita.usuario,
-                    ruta=horario.cita.ruta,
-                    tiempo_duracion=duracion_estimada,
-                    resultado="Pendiente",
-                    satisfaccion="Por evaluar"
-                )
-            else:
-                historial.tiempo_duracion = duracion_estimada
-                historial.save()
-
+        # Si no hay historial previo, lo creas
+        if not historial:
+            historial = HistorialUsuarioRuta.objects.create(
+                usuario=usuario,
+                ruta=horario.cita.ruta,
+                tiempo_duracion=duracion_estimada,
+                resultado="Pendiente",
+                satisfaccion="Por evaluar"
+            )
+        else:
+            historial.tiempo_duracion = duracion_estimada
+            historial.save()
 
     def update(self, request, *args, **kwargs):
         """
-        Solo permite actualizar horarios del usuario autenticado
+        Solo permite actualizar horarios del usuario por email
         """
-        instance = self.get_object()
-        if instance.cita.usuario != request.user:
+        user_email = request.data.get('user_email')
+        if not user_email:
             return Response(
-                {'error': 'No puedes actualizar horarios de otros usuarios'},
-                status=status.HTTP_403_FORBIDDEN
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
             )
+
+        instance = self.get_object()
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            if instance.cita.usuario != usuario:
+                return Response(
+                    {'error': 'No puedes actualizar horarios de otros usuarios'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         return super().update(request, *args, **kwargs)

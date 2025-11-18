@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usuario, TipoUsuario, Review, TipoAlerta, Alerta, UsuarioAlerta, Salud, Condicion, UsuarioCondicion, ContactoEmergencia, HorarioRetorno
+from .models import Usuario, TipoUsuario, Review, TipoAlerta, Alerta, UsuarioAlerta, Salud, Condicion, UsuarioCondicion, ContactoEmergencia, HorarioRetorno, UsuarioCondicion
 
 class TipoUsuarioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -21,15 +21,19 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         return user
 
 class UserSerializer(serializers.ModelSerializer):
-    tipo_usuario = TipoUsuarioSerializer(read_only=True)
-    
     class Meta:
         model = Usuario
-        fields = ['id', 'nombre', 'correo', 'edad', 'fecha_registro', 'tipo_usuario']
-        read_only_fields = ['id', 'fecha_registro', 'tipo_usuario']  # Estos no se pueden modificar
-
+        fields = ['id', 'nombre', 'correo', 'edad', 'fecha_registro', 'picture', 'tipo_usuario']
+        read_only_fields = ['id', 'fecha_registro', 'tipo_usuario']  # Campos que no se pueden modificar
+        
     def update(self, instance, validated_data):
-        # Lógica personalizada si necesitas manejar algo específico
+        instance.edad = validated_data.get('edad', instance.edad)
+        instance.nombre = validated_data.get('nombre', instance.nombre)
+        instance.save()
+        # Validar que no se intente modificar el correo (opcional)
+        if 'correo' in validated_data and validated_data['correo'] != instance.correo:
+            raise serializers.ValidationError({"correo": "No puedes cambiar tu correo electrónico"})
+        
         return super().update(instance, validated_data)
 
 class LoginSerializer(serializers.ModelSerializer):
@@ -49,12 +53,7 @@ class ContactoEmergenciaSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactoEmergencia
         fields = "__all__"
-        read_only_fields = ['usuario']  # El usuario se asigna automáticamente
-
-    def create(self, validated_data):
-        # Asegurar que el usuario se asigne desde el contexto
-        validated_data['usuario'] = self.context['request'].user
-        return super().create(validated_data)
+        # read_only_fields = ['usuario']
 
 class HorarioRetornoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -83,7 +82,7 @@ class SaludSerializer(serializers.ModelSerializer):
     class Meta:
         model = Salud
         fields = ['id', 'usuario', 'peso', 'altura', 'detalle']
-        read_only_fields = ['usuario']  # el usuario se asigna automáticamente
+       # read_only_fields = ['usuario']  # el usuario se asigna automáticamente
 
 
 class CondicionSerializer(serializers.ModelSerializer):
@@ -93,12 +92,28 @@ class CondicionSerializer(serializers.ModelSerializer):
 
 
 class UsuarioCondicionSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(write_only=True)
     condicion_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condicion.objects.all(), source='condicion', write_only=True
+        queryset=Condicion.objects.all(), 
+        source='condicion', 
+        write_only=True
     )
 
     class Meta:
         model = UsuarioCondicion
-        fields = ['id', 'usuario', 'condicion_id']
-        read_only_fields = ['usuario']
+        fields = ['id', 'user_email', 'condicion_id']
+
+    def create(self, validated_data):
+        user_email = validated_data.pop('user_email')
+        condicion = validated_data.pop('condicion')  # Esto viene de condicion_id
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+        except Usuario.DoesNotExist:
+            raise serializers.ValidationError({"error": "Usuario no encontrado"})
+        
+        return UsuarioCondicion.objects.create(
+            usuario=usuario,
+            condicion=condicion
+        )
 

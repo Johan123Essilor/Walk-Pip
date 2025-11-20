@@ -25,16 +25,20 @@ const Header = () => {
 
     return (
         <Navbar dark expand='lg' className='p-0'>
-            <NavbarBrand className='ms-5 d-flex align-items-center justify-content-center' href='/'>
-                <img src={FindMyTrailLogo} alt='Find My Trail logo' className='float-start' />
-            </NavbarBrand>
-
+    <NavbarBrand className='ms-5 d-flex align-items-center justify-content-center' href='/'>
+        <img 
+            src={FindMyTrailLogo} 
+            alt='Find My Trail logo' 
+            style={{ width: '65%' }}
+            className='float-start'
+        />
+    </NavbarBrand>
             <NavbarToggler onClick={() => setMenuOpen(!menuOpen)} />
             <Collapse isOpen={menuOpen} navbar>
                 <Nav className='ms-auto' navbar>
                     <NavItem>
                         <NavLink className='nav-link' to='/'>
-                            <i className='fa fa-home fa-lg' /> Home
+                            <i className='fa fa-home fa-lg' /> Inicio
                         </NavLink>
                     </NavItem>
                     <NavItem>

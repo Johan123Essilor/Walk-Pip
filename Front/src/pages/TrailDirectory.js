@@ -32,17 +32,17 @@ const TrailDirectory = () => {
   const markersRef = useRef([]);
   const leafletLoadedRef = useRef(false);
 
-  // ✅ Función mejorada para obtener rutas desde el backend
+  // Función mejorada para obtener rutas desde el backend
   const fetchTrailsFromBackend = async () => {
     try {
-      console.log('🔄 Obteniendo rutas desde el backend...');
+      console.log(' Obteniendo rutas desde el backend...');
       const response = await fetch(`${API_BASE_URL}/trail/rutas/`);
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
       }
 
       const rutasData = await response.json();
-      console.log('✅ Rutas obtenidas:', rutasData);
+      console.log('Rutas obtenidas:', rutasData);
 
       // Verificar si hay datos y mapearlos correctamente
       if (rutasData && Array.isArray(rutasData)) {
@@ -64,7 +64,7 @@ const TrailDirectory = () => {
       }
 
     } catch (error) {
-      console.error('❌ Error obteniendo rutas:', error);
+      console.error(' Error obteniendo rutas:', error);
       // Datos de ejemplo como fallback
       const fallbackTrails = [
         {
@@ -96,7 +96,7 @@ const TrailDirectory = () => {
   };
 
 
-  // ✅ Función para obtener TODOS los usuarios registrados (usando el endpoint existente)
+  // Función para obtener TODOS los usuarios registrados (usando el endpoint existente)
   const fetchAllUsers = async () => {
     try {
       setLoadingFriends(true);
@@ -120,7 +120,7 @@ const TrailDirectory = () => {
       setLoadingFriends(false);
     }
   };
-  // ✅ FUNCIÓN MEJORADA para inicializar el mapa
+  // FUNCIÓN MEJORADA para inicializar el mapa
   const initializeMap = async (rutas) => {
     if (typeof window === 'undefined' || !mapRef.current || rutas.length === 0) {
       return;
@@ -211,12 +211,12 @@ const TrailDirectory = () => {
     }
   };
 
-  // ✅ FUNCIÓN SIMPLIFICADA - Ya no necesitamos token JWT para citas
+  // FUNCIÓN SIMPLIFICADA - Ya no necesitamos token JWT para citas
   const obtenerTokenJWT = async () => {
     try {
-      console.log('🔑 Configurando autenticación...');
+      console.log(' Configurando autenticación...');
       const auth0Token = await getAccessTokenSilently();
-      console.log('✅ Token Auth0 obtenido (para futuros usos)');
+      console.log(' Token Auth0 obtenido (para futuros usos)');
 
       setDrfToken(auth0Token);
       localStorage.setItem('drf_token', auth0Token);
@@ -224,7 +224,7 @@ const TrailDirectory = () => {
       return auth0Token;
 
     } catch (error) {
-      console.error('❌ Error obteniendo token:', error);
+      console.error(' Error obteniendo token:', error);
       throw error;
     }
   };
@@ -274,7 +274,7 @@ const TrailDirectory = () => {
     }
   };
 
-  // ✅ Manejar selección/deselección de amigos
+  //  Manejar selección/deselección de amigos
   const toggleFriendSelection = (friendId) => {
     setSelectedFriends(prev => {
       if (prev.includes(friendId)) {
@@ -285,10 +285,10 @@ const TrailDirectory = () => {
     });
   };
 
-  // ✅ FUNCIÓN ACTUALIZADA para enviar cita con amigos
+  //  FUNCIÓN ACTUALIZADA para enviar cita con amigos
   const enviarCitaAlBackend = async (appointmentData) => {
     try {
-      console.log('📤 Enviando cita al backend...');
+      console.log(' Enviando cita al backend...');
 
       // Agregar el email del usuario y los amigos seleccionados
       const dataConUsuario = {
@@ -297,7 +297,7 @@ const TrailDirectory = () => {
         amigos_ids: selectedFriends
       };
 
-      console.log('📝 Datos completos:', dataConUsuario);
+      console.log(' Datos completos:', dataConUsuario);
 
       const response = await fetch(`${API_BASE_URL}/trail/agendar/`, {
         method: 'POST',

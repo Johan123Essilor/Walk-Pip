@@ -13,19 +13,12 @@ const HomePage = () => {
         <Container className='py-3 mb-5'>
           <Row className='justify-content-center align-items-center mx-auto'>
             <Col md={8} className='text-md-start text-center'>
-            <h2>Walk-Pip</h2>
-            <p >Encuentra tu ruta ideal</p>
+              <h2>Walk-Pip</h2>
+              <p style={{ fontSize: '1.1rem', margin: 0 }}>Encuentra tu ruta ideal</p>
             </Col>
-            {/* <Col className='text-center'>
-              <NewsletterSignup />
-            </Col> */}
           </Row>
         </Container>
       </div>
-{/* 
-      <div>
-        <FeaturedTrails />
-      </div> */}
 
       <div>
         <Container className='py-3 mb-5'>
@@ -35,7 +28,9 @@ const HomePage = () => {
             </Col>
             <Col>
               <h1>Nosotros</h1>
-              <p className='lead'>¡Haz clic en el botón para saber más sobre quiénes somos!</p>
+              <p className='lead'>
+                ¡Haz clic en el botón para saber más sobre quiénes somos!
+              </p>
               <a href='/about-us' className='btn btn-success btn-lg'>
                 Learn More
               </a>

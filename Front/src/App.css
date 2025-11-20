@@ -6,7 +6,7 @@
     --color-secondary: #c2a200; /* gold */
     --color-text: #1b1b1b; /* black */
     --color-background: rgb(255, 251, 243); /* white */
-    --header-font: 'Kalam', cursive;
+    --header-font: 'Roboto', sans-serif;
 }
 
 /* Global styles */

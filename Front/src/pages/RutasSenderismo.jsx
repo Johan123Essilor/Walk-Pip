@@ -162,7 +162,7 @@ export const RutasSenderismo = () => {
             {/* Header con búsqueda */}
             <div className="row mb-4">
                 <div className="col">
-                    <h1 className="text-center text-primary">Rutas de Senderismo</h1>
+                    <h1>Rutas de Senderismo</h1>
 
                     {/* Barra de búsqueda */}
                     <div className="input-group mb-3">
@@ -203,6 +203,7 @@ export const RutasSenderismo = () => {
                         <button
                             className={`btn ${vista === 'cards' ? 'btn-primary' : 'btn-outline-primary'}`}
                             onClick={() => setVista('cards')}
+                            
                         >
                             <i className="bi bi-grid-fill"></i> Cards
                         </button>

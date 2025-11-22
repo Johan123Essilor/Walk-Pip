@@ -57,6 +57,56 @@ class CitaViewSet(viewsets.ModelViewSet):
         
         serializer.save(usuario=user)
 
+
+    # NUEVO: Endpoint para obtener citas del usuario
+    @action(detail=False, methods=['get'], url_path='mis-citas')
+    def mis_citas(self, request):
+        """Obtener todas las citas del usuario"""
+        from users.models import Usuario
+        
+        user_email = request.query_params.get('user_email')
+        
+        if not user_email:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            citas = Cita.objects.filter(usuario=usuario).order_by('-fecha_visita')
+            
+            # Serializar con información adicional
+            citas_data = []
+            for cita in citas:
+                cita_data = CitaSerializer(cita).data
+                
+                # Agregar información de la ruta
+                if cita.ruta:
+                    cita_data['ruta_nombre'] = cita.ruta.nombre
+                    cita_data['ruta_dificultad'] = cita.ruta.nivel_experiencia
+                
+                # Buscar horario de retorno si existe
+                try:
+                    horario_retorno = HorarioRetorno.objects.get(cita=cita)
+                    cita_data['horario_retorno'] = {
+                        'id': horario_retorno.id,
+                        'hora_inicio': horario_retorno.hora_inicio,
+                        'hora_retorno': horario_retorno.hora_retorno
+                    }
+                except HorarioRetorno.DoesNotExist:
+                    cita_data['horario_retorno'] = None
+                
+                citas_data.append(cita_data)
+            
+            return Response(citas_data)
+            
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
     # ✅ Endpoint para obtener amigos del usuario
     @action(detail=False, methods=['get'], url_path='mis-amigos')
     def mis_amigos(self, request):

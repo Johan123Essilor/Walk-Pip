@@ -98,7 +98,12 @@ const Header = () => {
                                             <i className='fa fa-user fa-lg' /> Perfil
                                         </a>
                                     </li>
-                                    <li>
+                                     <li className='my-2'>
+                                            <a className='dropdown-item' href='/my-appointments'>
+                                                <i className='fa fa-calendar fa-lg' /> Mis Citas
+                                            </a>
+                                        </li>
+                                        <li><hr className="dropdown-divider" />
                                         <div className="dropdown-item-text small">
                                             {djangoUser ? (
                                                 <span className="text-success">✓ Sincronizado</span>

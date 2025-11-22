@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Container, Row, Col } from 'reactstrap';
 import { useAuth0 } from '@auth0/auth0-react';
 import ReviewsSection from './ReviewsSection';
+import ReturnTimeModal from '../components/ReturnTimeModal';
 // Obtener la URL base desde las variables de entorno
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -24,6 +25,9 @@ const TrailDirectory = () => {
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [showFriendSelector, setShowFriendSelector] = useState(false);
+  // En el estado del componente TrailDirectory
+  const [showReturnTimeModal, setShowReturnTimeModal] = useState(false);
+  const [lastAppointmentId, setLastAppointmentId] = useState(null);
 
   const { user, isAuthenticated, loginWithRedirect, getAccessTokenSilently } = useAuth0();
 
@@ -475,7 +479,9 @@ const TrailDirectory = () => {
 
       console.log(' Datos de la cita:', appointmentData);
 
-      await enviarCitaAlBackend(appointmentData);
+     const result = await enviarCitaAlBackend(appointmentData);
+
+     setLastAppointmentId(result.id);
 
       // Mensaje personalizado según si hay amigos invitados
       const mensaje = selectedFriends.length > 0 
@@ -490,6 +496,11 @@ const TrailDirectory = () => {
       setSelectedFriends([]);
       setShowFriendSelector(false);
 
+       // Mostrar modal para horario de retorno
+    setTimeout(() => {
+      setShowReturnTimeModal(true);
+    }, 1000);
+
     } catch (err) {
       console.error(' Error al agendar cita:', err);
       alert(` Error al agendar cita: ${err.message}`);
@@ -497,6 +508,11 @@ const TrailDirectory = () => {
       setIsLoading(false);
     }
   };
+
+  // Función para manejar el éxito del horario de retorno
+const handleReturnTimeSuccess = (result) => {
+  console.log('Horario de retorno guardado:', result);
+};
 
   return (
     <div>
@@ -1011,6 +1027,15 @@ const TrailDirectory = () => {
           </Col>
         </Row>
       </Container>
+<ReturnTimeModal
+  isOpen={showReturnTimeModal}
+  toggle={() => setShowReturnTimeModal(false)}
+  citaId={lastAppointmentId}
+  userEmail={user?.email}
+  onSuccess={handleReturnTimeSuccess}
+  appointmentDateTime={selectedDateTime.date && selectedDateTime.time ? 
+    `${selectedDateTime.date}T${selectedDateTime.time}:00` : null}
+/>
 
       <style jsx>{`
         .container-mapa {

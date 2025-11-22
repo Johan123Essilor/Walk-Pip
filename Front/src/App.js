@@ -13,6 +13,7 @@ import AboutPage from './pages/AboutPage';
 import { fetchTrails } from './features/trails/trailsSlice';
 import UserProfile from './pages/UserProfile';
 import ProfileOnboarding from './components/ProfileOnboarding';
+import MyAppointments from './pages/MyAppointments';
 import { useDispatch } from 'react-redux';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProfileCheck } from './hooks/useProfileCheck';
@@ -87,6 +88,7 @@ function App() {
           <Route path='/safety' element={<SafetyPage />} />
           <Route path='/about-us' element={<AboutPage />} />
           <Route path='/user-profile' element={<UserProfile />} />
+          <Route path='/my-appointments' element={<MyAppointments />} />
           <Route path='/list-routes' element={<RutasSenderismo />} />
         </Routes>
       )}

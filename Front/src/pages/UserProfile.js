@@ -4,13 +4,14 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useUserSync } from '../hooks/useUserSync';
 import LoginButton from "../components/LoginButton";
 import EditProfile from '../components/EditProfile';
+import AddEmergencyContact from '../components/AddEmergencyContact';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 const UserProfile = () => {
   const { user, isAuthenticated, isLoading } = useAuth0();
   const { isSyncing, syncError } = useUserSync();
-  
+
   // Estados para datos del usuario
   const [userData, setUserData] = useState(null);
   const [healthData, setHealthData] = useState(null);
@@ -96,7 +97,7 @@ const UserProfile = () => {
     return userConditions.map(userCond => {
       const conditionId = userCond.id || userCond.condicion || userCond.id_condicion;
       const conditionInfo = allConditions.find(cond => cond.id === conditionId);
-      
+
       return {
         ...userCond,
         condicion_id: conditionId,
@@ -109,10 +110,10 @@ const UserProfile = () => {
   // Función para cargar todos los datos del usuario
   const loadUserData = async () => {
     if (!user?.email) return;
-    
+
     setLoading(true);
     setDataError(null);
-    
+
     try {
       // Cargar todas las condiciones disponibles primero
       const allConditionsData = await fetchAllConditions();
@@ -131,7 +132,7 @@ const UserProfile = () => {
       setUserData(userDataResult);
       setHealthData(healthDataResult);
       setMedicalConditions(combinedConditions);
-      
+
     } catch (err) {
       console.error('Error loading user data:', err);
       setDataError('Error al cargar los datos del usuario. Por favor intenta recargar la página.');
@@ -190,7 +191,7 @@ const UserProfile = () => {
                 <i className="fa fa-user me-2"></i>
                 Mi Perfil
               </h3>
-              <button 
+              <button
                 className="btn btn-light btn-sm"
                 onClick={() => setEditModal(true)}
                 style={{ transition: 'none' }} // Eliminar transición hover
@@ -199,7 +200,7 @@ const UserProfile = () => {
                 Editar Datos Medicos
               </button>
             </div>
-            
+
             <div className="card-body">
               {/* Estado de sincronización */}
               {isSyncing && (
@@ -216,7 +217,7 @@ const UserProfile = () => {
                     Error de sincronización:
                   </strong>
                   <p className="mb-0 mt-1">{syncError}</p>
-                  <button 
+                  <button
                     className="btn btn-sm btn-outline-warning mt-2"
                     onClick={() => window.location.reload()}
                     style={{ transition: 'none' }}
@@ -239,7 +240,7 @@ const UserProfile = () => {
                 <div className="alert alert-danger">
                   <i className="fa fa-exclamation-triangle me-2"></i>
                   {dataError}
-                  <button 
+                  <button
                     className="btn btn-sm btn-outline-danger mt-2 ms-2"
                     onClick={loadUserData}
                     style={{ transition: 'none' }}
@@ -253,14 +254,14 @@ const UserProfile = () => {
                 <div className="row">
                   {/* Columna izquierda - Avatar e info básica */}
                   <div className="col-md-4 text-center border-end">
-                    <img 
-                      src={user.picture} 
-                      alt={user.name} 
+                    <img
+                      src={user.picture}
+                      alt={user.name}
                       className="img-fluid rounded-circle mb-3 shadow"
-                      style={{ 
-                        width: '150px', 
-                        height: '150px', 
-                        objectFit: 'cover' 
+                      style={{
+                        width: '150px',
+                        height: '150px',
+                        objectFit: 'cover'
                       }}
                     />
                     <h4 className="text-success">{user.name}</h4>
@@ -273,7 +274,7 @@ const UserProfile = () => {
                       <i className="fa fa-id-card me-2"></i>
                       Información Detallada
                     </h5>
-                    
+
                     <div className="row">
                       <div className="col-md-6">
                         <h6 className="text-success">
@@ -284,7 +285,7 @@ const UserProfile = () => {
                           <table className="table table-sm table-borderless">
                             <tbody>
                               <tr>
-                                <td className="fw-bold" style={{width: '100px'}}>Email:</td>
+                                <td className="fw-bold" style={{ width: '100px' }}>Email:</td>
                                 <td>{user.email}</td>
                               </tr>
                               <tr>
@@ -331,7 +332,7 @@ const UserProfile = () => {
                           <table className="table table-sm table-borderless">
                             <tbody>
                               <tr>
-                                <td className="fw-bold" style={{width: '100px'}}>Peso:</td>
+                                <td className="fw-bold" style={{ width: '100px' }}>Peso:</td>
                                 <td>
                                   {healthData?.peso ? (
                                     `${healthData.peso} kg`
@@ -356,9 +357,9 @@ const UserProfile = () => {
                                   {medicalConditions.length > 0 ? (
                                     <div>
                                       {medicalConditions.map(mc => (
-                                        <span 
-                                          key={mc.id} 
-                                          className="badge bg-light text-success me-1 mb-1" 
+                                        <span
+                                          key={mc.id}
+                                          className="badge bg-light text-success me-1 mb-1"
                                           title={mc.condicion_descripcion}
                                           style={{ transition: 'none' }}
                                         >
@@ -396,7 +397,7 @@ const UserProfile = () => {
                     {!healthData && !userData?.edad && (
                       <div className="alert alert-info mt-3">
                         <i className="fa fa-info-circle me-2"></i>
-                        <strong>Completa tu perfil:</strong> Agrega tu edad e información de salud 
+                        <strong>Completa tu perfil:</strong> Agrega tu edad e información de salud
                         para obtener recomendaciones personalizadas de rutas.
                       </div>
                     )}
@@ -405,6 +406,7 @@ const UserProfile = () => {
               )}
             </div>
           </div>
+          {<AddEmergencyContact />}
         </div>
       </div>
 

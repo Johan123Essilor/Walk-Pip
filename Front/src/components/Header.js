@@ -103,6 +103,11 @@ const Header = () => {
                                                 <i className='fa fa-calendar fa-lg' /> Mis Citas
                                             </a>
                                         </li>
+                                           <li className='my-2'>
+                                            <a className='dropdown-item' href='/my-history'>
+                                                <i className='fa fa-history fa-lg' /> Mi Historial
+                                            </a>
+                                        </li>
                                         <li><hr className="dropdown-divider" />
                                         <div className="dropdown-item-text small">
                                             {djangoUser ? (

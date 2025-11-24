@@ -20,7 +20,6 @@ from .serializers import (
     
 )
 
-
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioAmigoSerializer
@@ -34,6 +33,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         usuarios = Usuario.objects.all()
         serializer = self.get_serializer(usuarios, many=True)
         return Response(serializer.data)
+    
 class CitaViewSet(viewsets.ModelViewSet):
     serializer_class = CitaSerializer
     permission_classes = [AllowAny]
@@ -107,7 +107,7 @@ class CitaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-    # ✅ Endpoint para obtener amigos del usuario
+    # Endpoint para obtener amigos del usuario
     @action(detail=False, methods=['get'], url_path='mis-amigos')
     def mis_amigos(self, request):
         """Obtener lista de amigos del usuario"""
@@ -128,26 +128,33 @@ class CitaViewSet(viewsets.ModelViewSet):
         
         serializer = UsuarioAmigoSerializer(amigos, many=True)
         return Response(serializer.data)
+    
 class HistorialUsuarioRutaViewSet(viewsets.ModelViewSet):
     serializer_class = HistorialUsuarioRutaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     # Solo permitir GET y PATCH (no POST, PUT, DELETE)
     http_method_names = ['get', 'patch']
 
     def get_queryset(self):
         """
-        Solo ver el historial del usuario autenticado
+        Filtrar historial por email del usuario
         """
         if getattr(self, 'swagger_fake_view', False):
-            # Para Swagger durante la generación del schema
             return HistorialUsuarioRuta.objects.none()
         
-        # Verificar que el usuario esté autenticado
-        if not self.request.user.is_authenticated:
+        # Obtener usuario por email (igual que en CitaViewSet)
+        user_email = self.request.query_params.get('user_email') or self.request.data.get('user_email')
+        
+        if not user_email:
             return HistorialUsuarioRuta.objects.none()
-            
-        return HistorialUsuarioRuta.objects.filter(usuario=self.request.user)
+        
+        try:
+            from users.models import Usuario
+            usuario = Usuario.objects.get(correo=user_email)
+            return HistorialUsuarioRuta.objects.filter(usuario=usuario)
+        except Usuario.DoesNotExist:
+            return HistorialUsuarioRuta.objects.none()
 
     def update(self, request, *args, **kwargs):
         """
@@ -155,15 +162,30 @@ class HistorialUsuarioRutaViewSet(viewsets.ModelViewSet):
         """
         instance = self.get_object()
         
-        # Verificar que el usuario solo puede actualizar su propio historial
-        if instance.usuario != request.user:
+        # Verificar que el usuario solo puede actualizar su propio historial por email
+        user_email = request.data.get('user_email')
+        if not user_email:
             return Response(
-                {'error': 'No puedes actualizar el historial de otros usuarios'},
-                status=status.HTTP_403_FORBIDDEN
+                {'error': 'user_email es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from users.models import Usuario
+            usuario = Usuario.objects.get(correo=user_email)
+            if instance.usuario != usuario:
+                return Response(
+                    {'error': 'No puedes actualizar el historial de otros usuarios'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Usuario.DoesNotExist:
+            return Response(
+                {'error': 'Usuario no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
             )
         
         # Filtrar solo los campos permitidos para actualización
-        allowed_fields = ['resultado', 'satisfaccion']
+        allowed_fields = ['resultado', 'satisfaccion', 'tiempo_duracion']
         data = {key: request.data.get(key) for key in allowed_fields if key in request.data}
         
         serializer = self.get_serializer(instance, data=data, partial=True)
@@ -181,10 +203,25 @@ class HistorialUsuarioRutaViewSet(viewsets.ModelViewSet):
         """
         historial = self.get_object()
         
-        if historial.usuario != request.user:
+        user_email = request.data.get('user_email')
+        if not user_email:
             return Response(
-                {'error': 'No puedes actualizar este historial'},
-                status=status.HTTP_403_FORBIDDEN
+                {'error': 'user_email es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from users.models import Usuario
+            usuario = Usuario.objects.get(correo=user_email)
+            if historial.usuario != usuario:
+                return Response(
+                    {'error': 'No puedes actualizar este historial'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Usuario.DoesNotExist:
+            return Response(
+                {'error': 'Usuario no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
             )
         
         # Solo permitir estos campos
@@ -196,6 +233,33 @@ class HistorialUsuarioRutaViewSet(viewsets.ModelViewSet):
         serializer.save()
         
         return Response(serializer.data)
+
+    # NUEVO: Endpoint para obtener historial del usuario por email
+    @action(detail=False, methods=['get'], url_path='mi-historial')
+    def mi_historial(self, request):
+        """Obtener todo el historial del usuario"""
+        from users.models import Usuario
+        
+        user_email = request.query_params.get('user_email')
+        
+        if not user_email:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            usuario = Usuario.objects.get(correo=user_email)
+            historial = HistorialUsuarioRuta.objects.filter(usuario=usuario).order_by('-fecha')
+            
+            serializer = self.get_serializer(historial, many=True)
+            return Response(serializer.data)
+            
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuario no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
     
 class RutaViewSet(viewsets.ModelViewSet):
     """

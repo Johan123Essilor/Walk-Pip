@@ -14,6 +14,7 @@ import { fetchTrails } from './features/trails/trailsSlice';
 import UserProfile from './pages/UserProfile';
 import ProfileOnboarding from './components/ProfileOnboarding';
 import MyAppointments from './pages/MyAppointments';
+import RouteHistory from './pages/RouteHistory';
 import { useDispatch } from 'react-redux';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useProfileCheck } from './hooks/useProfileCheck';
@@ -90,6 +91,7 @@ function App() {
           <Route path='/user-profile' element={<UserProfile />} />
           <Route path='/my-appointments' element={<MyAppointments />} />
           <Route path='/list-routes' element={<RutasSenderismo />} />
+          <Route path='/my-history' element={<RouteHistory />} />
         </Routes>
       )}
       

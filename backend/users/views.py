@@ -12,6 +12,7 @@ from datetime import datetime, date
 
 # ✅ AÑADE TipoUsuario A ESTA IMPORTACIÓN:
 from .models import Usuario, Review, Condicion, UsuarioCondicion, Salud, ContactoEmergencia, HorarioRetorno, TipoUsuario
+from rest_framework.exceptions import ValidationError
 
 from .serializers import UserRegisterSerializer, UserSerializer, LoginSerializer, ReviewSerializer, SaludSerializer, CondicionSerializer, UsuarioCondicionSerializer, ContactoEmergenciaSerializer, HorarioRetornoSerializer
 
@@ -525,24 +526,25 @@ class HorarioRetornoViewSet(viewsets.ModelViewSet):
             fin = datetime.combine(date.today(), horario.hora_retorno)
             duracion_estimada = fin - inicio
 
-        # Buscar si hay historiales previos de esa ruta y usuario
-        historial = HistorialUsuarioRuta.objects.filter(
-            usuario=usuario,
-            ruta=horario.cita.ruta
-        ).last()
-
-        # Si no hay historial previo, lo creas
-        if not historial:
-            historial = HistorialUsuarioRuta.objects.create(
-                usuario=usuario,
-                ruta=horario.cita.ruta,
-                tiempo_duracion=duracion_estimada,
-                resultado="Pendiente",
-                satisfaccion="Por evaluar"
-            )
-        else:
-            historial.tiempo_duracion = duracion_estimada
-            historial.save()
+            fecha_cita = horario.cita.fecha_visita.date() 
+        
+        historial, created = HistorialUsuarioRuta.objects.get_or_create(
+        usuario=usuario,
+        ruta=horario.cita.ruta,
+        fecha=fecha_cita,
+        defaults={
+            'tiempo_duracion': duracion_estimada,
+            'resultado': 'en proceso',      # ← Estado real
+            'satisfaccion': 'por evaluar',      # ← Valor por defecto rea
+        }
+    )
+    
+        # # Si ya existía, actualizar la duración
+        # if not created:
+        #     historial.tiempo_duracion = duracion_estimada
+        #     historial.save()
+        
+        # print(f" Historial {'creado' if created else 'actualizado'}: {historial.id}")
 
     def update(self, request, *args, **kwargs):
         """

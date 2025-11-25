@@ -62,6 +62,7 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
 
       const result = await response.json();
       setSuccess('¡Horario de retorno guardado exitosamente!');
+      alert('Cita guardada exitosamente.');
       
       // Notificar al componente padre
       setTimeout(() => {
@@ -152,7 +153,7 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
           <small>
             <i className="fa fa-info-circle me-2"></i>
             Esta información nos ayuda a calcular la duración de tu actividad 
-            y mejorar nuestras recomendaciones futuras.
+            y mejorar nuestro servicio
           </small>
         </div>
       </ModalBody>

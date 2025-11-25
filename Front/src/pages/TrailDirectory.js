@@ -488,7 +488,7 @@ const TrailDirectory = () => {
         ? ` Cita agendada correctamente con ${selectedFriends.length} amigo(s)!` 
         : " Cita agendada correctamente!";
       
-      alert(mensaje);
+      // alert(mensaje);
 
       // Resetear formulario
       setSelectedDateTime({ date: '', time: '' });

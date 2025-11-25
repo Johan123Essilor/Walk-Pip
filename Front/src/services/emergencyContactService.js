@@ -40,11 +40,11 @@ class EmergencyContactService {
     }
 
     // Actualizar un contacto existente
-    async updateContact(contactId, contactData, userEmail) {
+    async updateContact(contactId, contactData) {
         try {
             this.validateContactData(contactData);
 
-            const response = await api.put(`/users/contacto-emergencia/?user_email=${userEmail}`, contactData);
+            const response = await api.put(`/users/contacto-emergencia/${contactId}/`, contactData);
             return response.data;
         } catch (error) {
             throw this.handleError(error);

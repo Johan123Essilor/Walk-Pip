@@ -63,7 +63,8 @@ const AddEmergencyContact = () => {
                 // Editar contacto existente
                 const contactId = contacts[editingIndex].id;
                 console.log('Updating contact ID:', contactId);
-                await emergencyContactService.updateContact(contactId, newContact, user.email ? user.email : null);
+                const bodyUpdate = { ...newContact, user_email: user.email };
+                await emergencyContactService.updateContact(contactId, bodyUpdate);
 
                 const updatedContacts = [...contacts];
                 updatedContacts[editingIndex] = { ...newContact, id: contactId };
@@ -313,14 +314,14 @@ const AddEmergencyContact = () => {
                                                     >
                                                         <i className="bi bi-pencil"></i>
                                                     </button>
-                                                    <button
+                                                    {/* <button
                                                         type="button"
                                                         className="btn btn-outline-danger"
                                                         onClick={() => handleDelete(index)}
                                                         disabled={loading}
                                                     >
                                                         <i className="bi bi-trash"></i>
-                                                    </button>
+                                                    </button> */}
                                                 </div>
                                             </div>
                                         </div>

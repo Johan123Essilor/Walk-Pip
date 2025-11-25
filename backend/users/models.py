@@ -105,6 +105,7 @@ class ContactoEmergencia(models.Model):
     nombre_contacto = models.CharField(max_length=100)
     correo = models.EmailField()
     parentesco = models.CharField(max_length=50)
+    telefono = models.CharField(max_length=15)
 
     class Meta:
         db_table = 'contacto_emergencia'

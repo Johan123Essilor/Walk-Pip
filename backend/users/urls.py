@@ -1,9 +1,10 @@
 # En tu urls.py actual - AÑADE la nueva ruta
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RegisterView, LoginView, ReviewViewSet, PerfilView, SaludViewSet, CondicionViewSet, ContactoEmergenciaViewSet, HorarioRetornoViewSet, UsuarioCondicionViewSet, sync_auth0_user # AÑADE sync_auth0_user
+from .views import RegisterView, LoginView, ReviewViewSet, PerfilView, SaludViewSet, CondicionViewSet, ContactoEmergenciaViewSet, HorarioRetornoViewSet, UsuarioCondicionViewSet, UsuarioViewSet, sync_auth0_user # AÑADE UsuarioViewSet
 
 router = DefaultRouter()
+router.register(r'', UsuarioViewSet, basename='usuarios')  # Para el endpoint /users/
 router.register(r'reviews', ReviewViewSet, basename='reviews')
 router.register(r'salud', SaludViewSet, basename='salud')
 router.register(r'condicion', CondicionViewSet, basename='condicion')

@@ -141,6 +141,26 @@ class LoginView(generics.CreateAPIView):
                 "refresh": str(token)
             }, status=status.HTTP_200_OK)
         return Response({"detail": "Credenciales inválidas"}, status=status.HTTP_401_UNAUTHORIZED)
+
+class UsuarioViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    ViewSet para obtener lista de usuarios disponibles.
+    Solo permite GET (lista) para agregar miembros a grupos.
+    """
+    serializer_class = UserSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        # Devolver todos los usuarios activos
+        return Usuario.objects.filter(is_active=True).order_by('nombre', 'correo')
+
+    def list(self, request, *args, **kwargs):
+        """
+        Devuelve lista de usuarios con información básica para agregar a grupos
+        """
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
     
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer

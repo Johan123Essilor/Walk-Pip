@@ -4,34 +4,46 @@ from users.models import Usuario
 
 class GrupoSerializer(serializers.ModelSerializer):
     creador_nombre = serializers.CharField(source='creador.nombre', read_only=True)
-    user_email = serializers.EmailField(write_only=True, required=False)
+    es_creador = serializers.SerializerMethodField()
+    mi_rol = serializers.SerializerMethodField()
+    user_email = serializers.EmailField(write_only=True, required=False)  # ← Agregado
     
     class Meta:
         model = Grupo
         fields = [
             'id', 'creador', 'creador_nombre', 'nombre', 'descripcion', 
-            'fecha_creacion', 'user_email'
+            'fecha_creacion', 'es_creador', 'mi_rol', 'user_email'  # ← Agregado
         ]
         read_only_fields = ['creador', 'fecha_creacion']
 
-    def validate(self, data):
-        """Validar y limpiar los datos antes de la creación"""
-        # Eliminar user_email de los datos validados ya que no es parte del modelo
-        data.pop('user_email', None)
-        return data
+    def get_es_creador(self, obj):
+        request = self.context.get('request')
+        if request:
+            user_email = request.data.get('user_email') or request.query_params.get('user_email')
+            if user_email:
+                try:
+                    usuario = Usuario.objects.get(correo=user_email)
+                    return obj.creador == usuario
+                except Usuario.DoesNotExist:
+                    return False
+        return False
+
+    def get_mi_rol(self, obj):
+        request = self.context.get('request')
+        if request:
+            user_email = request.data.get('user_email') or request.query_params.get('user_email')
+            if user_email:
+                try:
+                    usuario = Usuario.objects.get(correo=user_email)
+                    usuario_grupo = UsuarioGrupo.objects.get(usuario=usuario, grupo=obj)
+                    return usuario_grupo.rol
+                except (Usuario.DoesNotExist, UsuarioGrupo.DoesNotExist):
+                    return None
+        return None
 
     def create(self, validated_data):
-        """Crear grupo con solo los campos del modelo"""
-        # Asegurar que solo se pasen los campos del modelo Grupo
-        group_data = {
-            'nombre': validated_data.get('nombre'),
-            'descripcion': validated_data.get('descripcion', ''),
-        }
-        # El creador se asigna en perform_create del ViewSet
-        if 'creador' in validated_data:
-            group_data['creador'] = validated_data['creador']
-        
-        return Grupo.objects.create(**group_data)
+        # user_email se maneja en la view, no necesitamos request.user aquí
+        return super().create(validated_data)
 
 class UsuarioGrupoSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source='usuario.nombre', read_only=True)

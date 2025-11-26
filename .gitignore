@@ -1,0 +1,32 @@
+# Entorno virtual
+venv/
+env/
+ENV/
+
+# Archivos de dependencias automáticas
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+# Logs
+*.log
+
+# Configuración de IDEs
+.vscode/
+.idea/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Cachés de Python
+.pytest_cache/
+.cache/
+
+# Carpetas temporales
+tmp/
+temp/
+
+# Drivers descargados por webdriver-manager
+.wdm/

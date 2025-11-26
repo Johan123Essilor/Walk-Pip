@@ -4,7 +4,6 @@ import { Container, Row, Col } from 'reactstrap';
 import { useAuth0 } from '@auth0/auth0-react';
 import ReviewsSection from './ReviewsSection';
 import ReturnTimeModal from '../components/ReturnTimeModal';
-import CreateGroupForm from '../components/CreateGroupForm';
 // Obtener la URL base desde las variables de entorno
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -19,18 +18,13 @@ const TrailDirectory = () => {
   });
   const [selectedHourlyWeather, setSelectedHourlyWeather] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [drfToken, setDrfToken] = useState(null);  const [trails, setTrails] = useState([]);
+  const [drfToken, setDrfToken] = useState(null);
+  const [trails, setTrails] = useState([]);
   const [loadingTrails, setLoadingTrails] = useState(true);
-  
-  // Estados para gestión de grupos
-  const [groups, setGroups] = useState([]);
-  const [selectedGroup, setSelectedGroup] = useState(null);
-  const [selectedGroupMembers, setSelectedGroupMembers] = useState([]);
-  const [loadingGroups, setLoadingGroups] = useState(false);
-  const [showGroupSelector, setShowGroupSelector] = useState(false);
-  const [goingSolo, setGoingSolo] = useState(true); // true = solo, false = con grupo
-  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
-  
+  const [friends, setFriends] = useState([]);
+  const [selectedFriends, setSelectedFriends] = useState([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [showFriendSelector, setShowFriendSelector] = useState(false);
   // En el estado del componente TrailDirectory
   const [showReturnTimeModal, setShowReturnTimeModal] = useState(false);
   const [lastAppointmentId, setLastAppointmentId] = useState(null);
@@ -105,121 +99,42 @@ const TrailDirectory = () => {
     }
   };
 
-  // Función para cambiar entre ir solo o con grupo
-  const toggleCompanyType = (isSolo) => {
-    setGoingSolo(isSolo);
-    if (isSolo) {
-      // Limpiar selecciones de grupos si va solo
-      setSelectedGroup(null);
-      setSelectedGroupMembers([]);
-      setShowGroupSelector(false);
-    }
-  };
-  // Función para obtener grupos del usuario
-  const fetchUserGroups = async () => {
+
+  // Función para obtener TODOS los usuarios registrados (usando el endpoint existente)
+  const fetchAllUsers = async () => {
     try {
-      setLoadingGroups(true);
-      console.log('🔄 Obteniendo grupos del usuario...');
+      setLoadingFriends(true);
+      console.log('🔄 Obteniendo todos los usuarios...');
       
-      const response = await fetch(`${API_BASE_URL}/groups/grupos/?user_email=${user?.email || ''}`);
+      const response = await fetch(`${API_BASE_URL}/trail/agendar/mis-amigos/?user_email=${user?.email || ''}`);
       
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
       }
 
-      const groupsData = await response.json();
-      console.log('✅ Grupos obtenidos:', groupsData);
+      const usersData = await response.json();
+      console.log('✅ Usuarios obtenidos:', usersData);
 
-      setGroups(groupsData || []);
+      setFriends(usersData || []);
 
     } catch (error) {
-      console.error('❌ Error obteniendo grupos:', error);
-      setGroups([]);
+      console.error('❌ Error obteniendo usuarios:', error);
+      setFriends([]);
     } finally {
-      setLoadingGroups(false);
-    }
-  };  // Función para seleccionar un grupo y obtener sus miembros
-  const selectGroup = async (groupId) => {
-    try {
-      console.log('🔄 Obteniendo miembros del grupo...');
-      
-      const response = await fetch(`${API_BASE_URL}/groups/grupos/${groupId}/members/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_email: user?.email
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP ${response.status}`);
-      }
-
-      const membersData = await response.json();
-      console.log('✅ Miembros del grupo obtenidos:', membersData);
-
-      setSelectedGroup(groupId);
-      // Los miembros vienen en formato UsuarioGrupo, necesitamos extraer los usuarios
-      const usuarios = membersData.map(miembro => miembro.usuario || miembro);
-      setSelectedGroupMembers(usuarios);
-
-    } catch (error) {
-      console.error('❌ Error obteniendo miembros del grupo:', error);
-      setSelectedGroupMembers([]);
+      setLoadingFriends(false);
     }
   };
-  // Función para crear un nuevo grupo
-  const createNewGroup = async (groupData) => {
-    try {
-      console.log('🔄 Creando nuevo grupo...');
-      
-      const response = await fetch(`${API_BASE_URL}/groups/grupos/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },        body: JSON.stringify({
-          nombre: groupData.name,
-          descripcion: groupData.description,
-          user_email: user?.email
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error creando grupo');
-      }
-
-      const newGroup = await response.json();
-      console.log('✅ Grupo creado exitosamente:', newGroup);
-
-      // Actualizar la lista de grupos
-      setGroups(prev => [...prev, newGroup]);
-      setShowCreateGroupModal(false);
-      
-      return newGroup;
-
-    } catch (error) {
-      console.error('❌ Error creando grupo:', error);
-      throw error;
-    }
-  };
-  // FUNCIÓN MEJORADA para inicializar el mapa con mejor manejo de errores
+  // FUNCIÓN MEJORADA para inicializar el mapa
   const initializeMap = async (rutas) => {
     if (typeof window === 'undefined' || !mapRef.current || rutas.length === 0) {
-      console.log('🚫 Condiciones no válidas para inicializar mapa');
       return;
     }
 
     try {
       // Evitar múltiples inicializaciones
-      if (leafletLoadedRef.current && mapInstanceRef.current && mapInstanceRef.current._container) {
-        console.log('✅ Mapa ya inicializado');
+      if (leafletLoadedRef.current && mapInstanceRef.current) {
         return;
       }
-
-      console.log('🗺️ Inicializando mapa...');
 
       // Cargar Leaflet solo una vez
       if (!leafletLoadedRef.current) {
@@ -232,8 +147,7 @@ const TrailDirectory = () => {
         }
 
         // Esperar a que el CSS se cargue
-        await new Promise(resolve => setTimeout(resolve, 200));
-        leafletLoadedRef.current = true;
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       // Importar Leaflet
@@ -247,101 +161,52 @@ const TrailDirectory = () => {
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
       });
 
-      // Limpiar mapa existente de forma segura
+      // Limpiar mapa existente
       if (mapInstanceRef.current) {
-        try {
-          if (mapInstanceRef.current.remove) {
-            mapInstanceRef.current.remove();
-          }
-        } catch (cleanupError) {
-          console.warn('⚠️ Error limpiando mapa anterior:', cleanupError);
-        }
-        mapInstanceRef.current = null;
+        mapInstanceRef.current.remove();
       }
 
-      // Limpiar marcadores existentes
-      markersRef.current = [];
-
-      // Verificar que el contenedor DOM esté disponible
-      if (!mapRef.current || !mapRef.current.offsetParent) {
-        console.warn('⚠️ Contenedor DOM no disponible, reintentando...');
-        setTimeout(() => initializeMap(rutas), 500);
-        return;
-      }      // Crear nuevo mapa con timeout para asegurar que el DOM esté listo
+      // Crear nuevo mapa con timeout para asegurar que el DOM esté listo
       setTimeout(() => {
         try {
-          // Verificar nuevamente que el contenedor esté disponible
-          if (!mapRef.current) {
-            console.error('❌ Contenedor del mapa no disponible al crear instancia');
-            return;
-          }
+          mapInstanceRef.current = L.map(mapRef.current).setView([32.525045, -117.018443], 10);
 
-          // Crear instancia del mapa con validación
-          const mapContainer = mapRef.current;
-          mapInstanceRef.current = L.map(mapContainer, {
-            center: [32.525045, -117.018443],
-            zoom: 10,
-            preferCanvas: true,
-            renderer: L.canvas()
-          });
-
-          // Verificar que la instancia se creó correctamente
-          if (!mapInstanceRef.current) {
-            console.error('❌ No se pudo crear la instancia del mapa');
-            return;
-          }
-
-          // Agregar capa de tiles
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap',
-            maxZoom: 18
+            attribution: '© OpenStreetMap'
           }).addTo(mapInstanceRef.current);
 
-          // Limpiar marcadores anteriores de forma segura
+          // Limpiar marcadores anteriores
           markersRef.current.forEach(marker => {
-            if (marker && mapInstanceRef.current && marker.remove) {
-              try {
-                marker.remove();
-              } catch (removeError) {
-                console.warn('⚠️ Error removiendo marcador:', removeError);
-              }
+            if (marker && mapInstanceRef.current) {
+              mapInstanceRef.current.removeLayer(marker);
             }
           });
           markersRef.current = [];
 
           // Agregar marcadores para cada ruta
           rutas.forEach(trail => {
-            if (trail.lat && trail.lon && mapInstanceRef.current) {
-              try {
-                const marker = L.marker([trail.lat, trail.lon])
-                  .addTo(mapInstanceRef.current)
-                  .on('click', async () => {
-                    console.log('📍 Marcador clickeado:', trail.nombre);
-                    await handleTrailSelect(trail);
-                  })
-                  .bindPopup(`
-                    <div style="min-width: 200px;">
-                      <b>${trail.nombre}</b><br>
-                      <small>${trail.descripcion}</small><br>
-                      <em>Nivel: ${trail.nivel_experiencia}</em>
-                    </div>
-                  `);
-                markersRef.current.push(marker);
-              } catch (markerError) {
-                console.error('❌ Error creando marcador para:', trail.nombre, markerError);
-              }
+            if (trail.lat && trail.lon) {
+              const marker = L.marker([trail.lat, trail.lon])
+                .addTo(mapInstanceRef.current)
+                .on('click', async () => {
+                  await handleTrailSelect(trail);
+                })
+                .bindPopup(`
+                  <div style="min-width: 200px;">
+                    <b>${trail.nombre}</b><br>
+                    <small>${trail.descripcion}</small><br>
+                    <em>Nivel: ${trail.nivel_experiencia}</em>
+                  </div>
+                `);
+              markersRef.current.push(marker);
             }
           });
 
-          console.log('✅ Mapa inicializado correctamente con', rutas.length, 'rutas');
+          leafletLoadedRef.current = true;
+          console.log('🗺️ Mapa inicializado con', rutas.length, 'rutas');
 
         } catch (mapError) {
-          console.error('❌ Error creando el mapa:', mapError);
-          // Reintentar después de un tiempo si falló
-          setTimeout(() => {
-            console.log('🔄 Reintentando inicialización del mapa...');
-            initializeMap(rutas);
-          }, 2000);
+          console.error(' Error creando el mapa:', mapError);
         }
       }, 500);
 
@@ -412,16 +277,28 @@ const TrailDirectory = () => {
       return null;
     }
   };
-  //  FUNCIÓN SIMPLIFICADA para enviar cita solo con grupos
+
+  //  Manejar selección/deselección de amigos
+  const toggleFriendSelection = (friendId) => {
+    setSelectedFriends(prev => {
+      if (prev.includes(friendId)) {
+        return prev.filter(id => id !== friendId);
+      } else {
+        return [...prev, friendId];
+      }
+    });
+  };
+
+  //  FUNCIÓN ACTUALIZADA para enviar cita con amigos
   const enviarCitaAlBackend = async (appointmentData) => {
     try {
-      console.log('🚀 Enviando cita al backend...');
+      console.log(' Enviando cita al backend...');
 
-      // Preparar datos - solo usar campo 'compania' para grupos
+      // Agregar el email del usuario y los amigos seleccionados
       const dataConUsuario = {
         ...appointmentData,
         user_email: user?.email,
-        compania: goingSolo ? null : selectedGroup
+        amigos_ids: selectedFriends
       };
 
       console.log(' Datos completos:', dataConUsuario);
@@ -515,7 +392,13 @@ const TrailDirectory = () => {
     }
   }, [trails, searchParams, selectedTrail]);
 
-  // Manejar selección de ruta con validación mejorada del mapa
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchAllUsers();
+    }
+  }, [isAuthenticated, user]);
+
+  // Manejar selección de ruta
   const handleTrailSelect = async (trail) => {
     setSelectedTrail(trail);
 
@@ -525,26 +408,8 @@ const TrailDirectory = () => {
     const hourly = await fetchHourlyWeather(trail.lat, trail.lon);
     setHourlyWeather(hourly);
 
-    // Validación más robusta del mapa antes de intentar usar setView
-    if (mapInstanceRef.current && 
-        mapInstanceRef.current._container && 
-        mapInstanceRef.current._loaded &&
-        typeof mapInstanceRef.current.setView === 'function') {
-      try {
-        mapInstanceRef.current.setView([trail.lat, trail.lon], 12);
-      } catch (error) {
-        console.warn('⚠️ Error al cambiar vista del mapa:', error);
-        // Intentar reinicializar el mapa si es necesario
-        setTimeout(() => {
-          if (mapInstanceRef.current && mapInstanceRef.current.setView) {
-            try {
-              mapInstanceRef.current.setView([trail.lat, trail.lon], 12);
-            } catch (retryError) {
-              console.error('❌ Error al reintentar cambio de vista:', retryError);
-            }
-          }
-        }, 100);
-      }
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([trail.lat, trail.lon], 12);
     }
   };
 
@@ -581,7 +446,8 @@ const TrailDirectory = () => {
       icon: weatherInfo.icon
     });
   };
-  //  Manejar agendamiento de cita ACTUALIZADO con validaciones para grupos
+
+  //  Manejar agendamiento de cita ACTUALIZADO
   const handleScheduleAppointment = async () => {
     if (!isAuthenticated) {
       alert(" Primero debes iniciar sesión antes de agendar una cita.");
@@ -598,16 +464,6 @@ const TrailDirectory = () => {
     if (!selectedTrail) {
       alert("No hay ninguna ruta seleccionada.");
       return;
-    }    // Validaciones para grupos
-    if (!goingSolo) {
-      if (!selectedGroup) {
-        alert("Debes seleccionar un grupo antes de agendar.");
-        return;
-      }
-      if (selectedGroupMembers.length === 0) {
-        alert("El grupo seleccionado no tiene miembros.");
-        return;
-      }
     }
 
     setIsLoading(true);
@@ -621,21 +477,24 @@ const TrailDirectory = () => {
         compania: null
       };
 
-      console.log(' Datos de la cita:', appointmentData);     const result = await enviarCitaAlBackend(appointmentData);     setLastAppointmentId(result.id);
+      console.log(' Datos de la cita:', appointmentData);
 
-      // Mensaje personalizado según si va solo o en grupo
-      let mensaje = "✅ Cita agendada correctamente!";
-      if (!goingSolo && selectedGroup) {
-        mensaje = `✅ Cita agendada correctamente para el grupo con ${selectedGroupMembers.length} miembro(s)!`;
-      }
+     const result = await enviarCitaAlBackend(appointmentData);
+
+     setLastAppointmentId(result.id);
+
+      // Mensaje personalizado según si hay amigos invitados
+      const mensaje = selectedFriends.length > 0 
+        ? ` Cita agendada correctamente con ${selectedFriends.length} amigo(s)!` 
+        : " Cita agendada correctamente!";
       
       alert(mensaje);
 
       // Resetear formulario
       setSelectedDateTime({ date: '', time: '' });
       setSelectedHourlyWeather(null);
-      setSelectedGroup(null);      setSelectedGroupMembers([]);
-      setShowGroupSelector(false);
+      setSelectedFriends([]);
+      setShowFriendSelector(false);
 
        // Mostrar modal para horario de retorno
     setTimeout(() => {
@@ -960,7 +819,9 @@ const handleReturnTimeSuccess = (result) => {
                           </div>
                         </div>
                       )}
-                    </div>                    {/* ✅ SECCIÓN SIMPLIFICADA: Solo vs Grupo */}
+                    </div>
+
+                    {/* ✅ NUEVA SECCIÓN: Selección de amigos (todos los usuarios) */}
                     <div style={{
                       background: 'linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%)',
                       borderRadius: '10px',
@@ -968,170 +829,78 @@ const handleReturnTimeSuccess = (result) => {
                       border: '1px solid #e0e0e0',
                       marginTop: '16px'
                     }}>
-
-                      {/* Selector simplificado: Solo vs Grupo */}
                       <div style={{
-                        marginBottom: '16px',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '8px',
-                        padding: '12px',
-                        backgroundColor: '#f9f9f9'
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '12px'
                       }}>
                         <p style={{
                           color: '#1b1b1b',
                           fontWeight: '600',
-                          margin: '0 0 12px 0',
+                          margin: '0',
                           fontSize: '1rem'
                         }}>
-                          ¿Cómo planeas hacer la caminata?
+                          Invitar compañeros:
                         </p>
-                        <div style={{
-                          display: 'flex',
-                          gap: '10px'
-                        }}>
-                          <button
-                            onClick={() => toggleCompanyType(true)}
-                            style={{
-                              backgroundColor: goingSolo ? '#2e7d32' : 'transparent',
-                              color: goingSolo ? 'white' : '#2e7d32',
-                              border: '1px solid #2e7d32',
-                              padding: '8px 16px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              fontSize: '0.85rem',
-                              transition: 'all 0.3s ease',
-                              flex: 1
-                            }}
-                          >
-                            🚶‍♂️ Ir solo
-                          </button>
-                          <button
-                            onClick={() => toggleCompanyType(false)}
-                            style={{
-                              backgroundColor: !goingSolo ? '#2e7d32' : 'transparent',
-                              color: !goingSolo ? 'white' : '#2e7d32',
-                              border: '1px solid #2e7d32',
-                              padding: '8px 16px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              fontSize: '0.85rem',
-                              transition: 'all 0.3s ease',
-                              flex: 1
-                            }}
-                          >
-                            👥 Con grupo
-                          </button>
-                        </div>
-                      </div>                      {/* Selector de grupos */}
-                      {!goingSolo && (
-                        <div style={{ marginBottom: '16px' }}>
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '12px'
-                          }}>
-                            <p style={{
-                              color: '#1b1b1b',
-                              fontWeight: '600',
-                              margin: '0',
-                              fontSize: '1rem'
-                            }}>
-                              Seleccionar grupo:
-                            </p>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              <button
-                                onClick={() => {
-                                  setShowGroupSelector(!showGroupSelector);
-                                  if (!showGroupSelector) {
-                                    fetchUserGroups();
-                                  }
-                                }}
-                                style={{
-                                  backgroundColor: 'transparent',
-                                  color: '#2e7d32',
-                                  border: '1px solid #2e7d32',
-                                  padding: '6px 12px',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  fontWeight: '600',
-                                  fontSize: '0.8rem',
-                                  transition: 'all 0.3s ease'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.backgroundColor = '#2e7d32';
-                                  e.target.style.color = 'white';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.backgroundColor = 'transparent';
-                                  e.target.style.color = '#2e7d32';
-                                }}
-                              >
-                                {showGroupSelector ? 'Ocultar' : 'Ver grupos'}
-                              </button>
-                              <button
-                                onClick={() => setShowCreateGroupModal(true)}
-                                style={{
-                                  backgroundColor: '#4caf50',
-                                  color: 'white',
-                                  border: 'none',
-                                  padding: '6px 12px',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  fontWeight: '600',
-                                  fontSize: '0.8rem',
-                                  transition: 'all 0.3s ease'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.backgroundColor = '#388e3c';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.backgroundColor = '#4caf50';
-                                }}
-                              >
-                                + Crear grupo
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                        <button
+                          onClick={() => setShowFriendSelector(!showFriendSelector)}
+                          style={{
+                            backgroundColor: 'transparent',
+                            color: '#2e7d32',
+                            border: '1px solid #2e7d32',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '0.8rem',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#2e7d32';
+                            e.target.style.color = 'white';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'transparent';
+                            e.target.style.color = '#2e7d32';
+                          }}
+                        >
+                          {showFriendSelector ? 'Ocultar' : 'Seleccionar'}
+                        </button>
+                      </div>
 
-                      {/* Modal de selección de grupos */}
-                      {showGroupSelector && (
+                      {showFriendSelector && (
                         <div style={{
                           maxHeight: '200px',
                           overflowY: 'auto',
                           border: '1px solid #e0e0e0',
                           borderRadius: '6px',
                           padding: '8px',
-                          backgroundColor: 'white',
-                          marginBottom: '12px'
+                          backgroundColor: 'white'
                         }}>
-                          {loadingGroups ? (
+                          {loadingFriends ? (
                             <div style={{ textAlign: 'center', padding: '10px' }}>
                               <div className="spinner-border spinner-border-sm text-success" role="status">
                                 <span className="visually-hidden">Cargando...</span>
                               </div>
-                              <span style={{ marginLeft: '8px', fontSize: '0.8rem' }}>Cargando grupos...</span>
+                              <span style={{ marginLeft: '8px', fontSize: '0.8rem' }}>Cargando usuarios...</span>
                             </div>
-                          ) : groups.length > 0 ? (
-                            groups.map(group => (
+                          ) : friends.length > 0 ? (
+                            friends.map(friend => (
                               <div
-                                key={group.id}
+                                key={friend.id}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
                                   padding: '8px',
                                   borderBottom: '1px solid #f0f0f0',
                                   cursor: 'pointer',
-                                  backgroundColor: selectedGroup === group.id ? '#e8f5e8' : 'transparent',
+                                  backgroundColor: selectedFriends.includes(friend.id) ? '#e8f5e8' : 'transparent',
                                   borderRadius: '4px',
                                   marginBottom: '4px',
                                   transition: 'all 0.2s ease'
                                 }}
-                                onClick={() => selectGroup(group.id)}
+                                onClick={() => toggleFriendSelection(friend.id)}
                               >
                                 <div style={{
                                   width: '32px',
@@ -1146,77 +915,34 @@ const handleReturnTimeSuccess = (result) => {
                                   fontSize: '0.8rem',
                                   marginRight: '10px'
                                 }}>
-                                  👥
-                                </div>                                <div>
+                                  {friend.nombre ? friend.nombre.charAt(0).toUpperCase() : 'U'}
+                                </div>
+                                <div>
                                   <div style={{ fontWeight: '600', fontSize: '0.85rem' }}>
-                                    {group.nombre || 'Grupo sin nombre'}
+                                    {friend.nombre || 'Usuario'}
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: '#666' }}>
-                                    {group.members_count || 0} miembros • Creado: {group.fecha_creacion}
+                                    {friend.correo}
                                   </div>
                                 </div>
                                 <div style={{ marginLeft: 'auto' }}>
-                                  {selectedGroup === group.id ? '✅' : '⚪'}
+                                  {selectedFriends.includes(friend.id) ? '✅' : '⚪'}
                                 </div>
                               </div>
                             ))
                           ) : (
                             <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '0.8rem' }}>
-                              No tienes grupos creados. <br />
-                              <button
-                                onClick={() => setShowCreateGroupModal(true)}
-                                style={{
-                                  backgroundColor: 'transparent',
-                                  color: '#2e7d32',
-                                  border: 'none',
-                                  textDecoration: 'underline',
-                                  cursor: 'pointer',
-                                  fontSize: '0.8rem',
-                                  marginTop: '4px'
-                                }}
-                              >
-                                Crear tu primer grupo
-                              </button>
+                              No hay otros usuarios registrados.
                             </div>
                           )}
                         </div>
                       )}
 
-                      {/* Información del grupo seleccionado */}
-                      {selectedGroup && selectedGroupMembers.length > 0 && (
-                        <div style={{ 
-                          marginTop: '12px',
-                          border: '1px solid #e8f5e8',
-                          borderRadius: '6px',
-                          padding: '12px',
-                          backgroundColor: '#f9fff9'
-                        }}>
-                          <p style={{ fontSize: '0.85rem', color: '#2e7d32', fontWeight: '600', margin: '0 0 8px 0' }}>
-                            ✅ Grupo seleccionado: {selectedGroupMembers.length} miembro(s)
+                      {selectedFriends.length > 0 && (
+                        <div style={{ marginTop: '12px' }}>
+                          <p style={{ fontSize: '0.8rem', color: '#2e7d32', fontWeight: '600', margin: '0' }}>
+                            ✅ {selectedFriends.length} compañero(s) seleccionado(s)
                           </p>
-                          <div style={{ 
-                            display: 'flex', 
-                            flexWrap: 'wrap', 
-                            gap: '6px',
-                            maxHeight: '80px',
-                            overflowY: 'auto'
-                          }}>
-                            {selectedGroupMembers.map(member => (
-                              <div
-                                key={member.id}
-                                style={{
-                                  backgroundColor: '#2e7d32',
-                                  color: 'white',
-                                  padding: '4px 8px',
-                                  borderRadius: '12px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: '500'
-                                }}
-                              >
-                                {member.nombre || member.correo || 'Usuario'}
-                              </div>
-                            ))}
-                          </div>
                         </div>
                       )}
                     </div>
@@ -1310,73 +1036,6 @@ const handleReturnTimeSuccess = (result) => {
   appointmentDateTime={selectedDateTime.date && selectedDateTime.time ? 
     `${selectedDateTime.date}T${selectedDateTime.time}:00` : null}
 />
-
-      {/* Modal de creación de grupos */}
-      {showCreateGroupModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '500px',
-            width: '90%',
-            maxHeight: '90%',
-            overflowY: 'auto',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px'
-            }}>
-              <h3 style={{
-                margin: 0,
-                color: '#1b1b1b',
-                fontWeight: '700',
-                fontSize: '1.2rem'
-              }}>
-                Crear Nuevo Grupo
-              </h3>
-              <button
-                onClick={() => setShowCreateGroupModal(false)}
-                style={{
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#666',
-                  padding: '0',
-                  width: '30px',
-                  height: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <CreateGroupForm 
-              onSubmit={createNewGroup}
-              onCancel={() => setShowCreateGroupModal(false)}
-              userEmail={user?.email}
-            />
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         .container-mapa {

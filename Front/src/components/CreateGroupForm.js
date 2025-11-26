@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 const CreateGroupForm = ({ onSubmit, onCancel, userEmail }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    description: ''
+    nombre: '',
+    descripcion: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,16 +15,15 @@ const CreateGroupForm = ({ onSubmit, onCancel, userEmail }) => {
       [name]: value
     }));
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
+    if (!formData.nombre.trim()) {
       setError('El nombre del grupo es obligatorio');
       return;
     }
 
-    if (formData.name.length < 3) {
+    if (formData.nombre.length < 3) {
       setError('El nombre debe tener al menos 3 caracteres');
       return;
     }
@@ -66,11 +65,10 @@ const CreateGroupForm = ({ onSubmit, onCancel, userEmail }) => {
           fontSize: '0.9rem'
         }}>
           Nombre del grupo *
-        </label>
-        <input
+        </label>        <input
           type="text"
-          name="name"
-          value={formData.name}
+          name="nombre"
+          value={formData.nombre}
           onChange={handleChange}
           placeholder="Ej: Senderistas Monterrey"
           required
@@ -98,10 +96,9 @@ const CreateGroupForm = ({ onSubmit, onCancel, userEmail }) => {
           fontSize: '0.9rem'
         }}>
           Descripción
-        </label>
-        <textarea
-          name="description"
-          value={formData.description}
+        </label>        <textarea
+          name="descripcion"
+          value={formData.descripcion}
           onChange={handleChange}
           placeholder="Describe brevemente el grupo y sus objetivos..."
           rows={3}
@@ -156,28 +153,26 @@ const CreateGroupForm = ({ onSubmit, onCancel, userEmail }) => {
         
         <button
           type="submit"
-          disabled={loading || !formData.name.trim()}
-          style={{
-            backgroundColor: loading || !formData.name.trim() ? '#ccc' : '#2e7d32',
+          disabled={loading || !formData.nombre.trim()}
+          style={{            backgroundColor: loading || !formData.nombre.trim() ? '#ccc' : '#2e7d32',
             color: 'white',
             border: 'none',
             padding: '10px 20px',
             borderRadius: '6px',
-            cursor: (loading || !formData.name.trim()) ? 'not-allowed' : 'pointer',
+            cursor: (loading || !formData.nombre.trim()) ? 'not-allowed' : 'pointer',
             fontWeight: '600',
             fontSize: '0.9rem',
             transition: 'all 0.3s ease',
             display: 'flex',
             alignItems: 'center',
             gap: '8px'
-          }}
-          onMouseEnter={(e) => {
-            if (!loading && formData.name.trim()) {
+          }}          onMouseEnter={(e) => {
+            if (!loading && formData.nombre.trim()) {
               e.target.style.backgroundColor = '#1b5e20';
             }
           }}
           onMouseLeave={(e) => {
-            if (!loading && formData.name.trim()) {
+            if (!loading && formData.nombre.trim()) {
               e.target.style.backgroundColor = '#2e7d32';
             }
           }}

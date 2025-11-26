@@ -18,21 +18,21 @@ const root = createRoot(container);
 
 // En src/index.js
 root.render(
-  <Auth0Provider
-    domain={process.env.REACT_APP_AUTH0_DOMAIN}
-    clientId={process.env.REACT_APP_AUTH0_CLIENT_ID}
-    authorizationParams={{
-      redirect_uri: window.location.origin
-    }}
-    cacheLocation="localstorage" // ✅ Añade esta línea
-    useRefreshTokens={true} // ✅ Opcional: para tokens de refresco
-  >
-    <React.StrictMode>
+  <React.StrictMode>
+    <Auth0Provider
+      domain={process.env.REACT_APP_AUTH0_DOMAIN}
+      clientId={process.env.REACT_APP_AUTH0_CLIENT_ID}
+      authorizationParams={{
+        redirect_uri: window.location.origin
+      }}
+      cacheLocation="localstorage"
+      useRefreshTokens={true}
+    >
       <Provider store={store}>
         <BrowserRouter>
           <App />
         </BrowserRouter>
       </Provider>
-    </React.StrictMode>
-  </Auth0Provider>
+    </Auth0Provider>
+  </React.StrictMode>
 );

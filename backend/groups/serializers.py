@@ -4,45 +4,19 @@ from users.models import Usuario
 
 class GrupoSerializer(serializers.ModelSerializer):
     creador_nombre = serializers.CharField(source='creador.nombre', read_only=True)
-    es_creador = serializers.SerializerMethodField()
-    mi_rol = serializers.SerializerMethodField()
-    user_email = serializers.EmailField(write_only=True, required=False)  # ← Agregado
+    user_email = serializers.EmailField(write_only=True, required=False)
     
     class Meta:
         model = Grupo
         fields = [
             'id', 'creador', 'creador_nombre', 'nombre', 'descripcion', 
-            'fecha_creacion', 'es_creador', 'mi_rol', 'user_email'  # ← Agregado
+            'fecha_creacion', 'user_email'
         ]
         read_only_fields = ['creador', 'fecha_creacion']
 
-    def get_es_creador(self, obj):
-        request = self.context.get('request')
-        if request:
-            user_email = request.data.get('user_email') or request.query_params.get('user_email')
-            if user_email:
-                try:
-                    usuario = Usuario.objects.get(correo=user_email)
-                    return obj.creador == usuario
-                except Usuario.DoesNotExist:
-                    return False
-        return False
-
-    def get_mi_rol(self, obj):
-        request = self.context.get('request')
-        if request:
-            user_email = request.data.get('user_email') or request.query_params.get('user_email')
-            if user_email:
-                try:
-                    usuario = Usuario.objects.get(correo=user_email)
-                    usuario_grupo = UsuarioGrupo.objects.get(usuario=usuario, grupo=obj)
-                    return usuario_grupo.rol
-                except (Usuario.DoesNotExist, UsuarioGrupo.DoesNotExist):
-                    return None
-        return None
-
     def create(self, validated_data):
-        # user_email se maneja en la view, no necesitamos request.user aquí
+        # Remover user_email ya que no es parte del modelo Grupo
+        validated_data.pop('user_email', None)
         return super().create(validated_data)
 
 class UsuarioGrupoSerializer(serializers.ModelSerializer):

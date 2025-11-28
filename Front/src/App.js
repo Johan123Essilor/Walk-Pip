@@ -13,6 +13,8 @@ import AboutPage from './pages/AboutPage';
 import { fetchTrails } from './features/trails/trailsSlice';
 import UserProfile from './pages/UserProfile';
 import ProfileOnboarding from './components/ProfileOnboarding';
+import MyGroups from './pages/MyGroups';
+import GroupInvitation from './pages/GroupInvitation';
 import MyAppointments from './pages/MyAppointments';
 import RouteHistory from './pages/RouteHistory';
 import { useDispatch } from 'react-redux';
@@ -89,6 +91,8 @@ function App() {
           <Route path='/safety' element={<SafetyPage />} />
           <Route path='/about-us' element={<AboutPage />} />
           <Route path='/user-profile' element={<UserProfile />} />
+          <Route path='/my-groups' element={<MyGroups />} />
+           <Route path='/groups/invitations/' element={<GroupInvitation />} />
           <Route path='/my-appointments' element={<MyAppointments />} />
           <Route path='/list-routes' element={<RutasSenderismo />} />
           <Route path='/my-history' element={<RouteHistory />} />

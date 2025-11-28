@@ -32,7 +32,7 @@ class GrupoViewSet(viewsets.ModelViewSet):
             return UsuarioGrupoSerializer
         elif self.action in ['schedule_activity']:
             return ProgramarActividadSerializer
-        elif self.action in ['accept_invitation', 'join', 'leave']:
+        elif self.action in ['accept_invitation',  'reject_invitation', 'join', 'leave']:
             return EmptySerializer
         elif self.action == 'transfer_ownership':
             return TransferOwnershipSerializer
@@ -51,11 +51,11 @@ class GrupoViewSet(viewsets.ModelViewSet):
 
         try:
             usuario = Usuario.objects.get(correo=user_email)
-            # Usuario puede ver grupos donde es miembro o creador
+        # ✅ SOLO grupos donde el usuario es CREADOR o ha ACEPTADO la invitación
             return Grupo.objects.filter(
                 Q(creador=usuario) |
-                Q(usuariogrupo__usuario=usuario)
-            ).distinct()
+                Q(usuariogrupo__usuario=usuario, usuariogrupo__aceptado=True)  # ← Solo miembros aceptados
+            ).select_related('creador').distinct()
         except Usuario.DoesNotExist:
             return Grupo.objects.none()
 
@@ -191,7 +191,8 @@ class GrupoViewSet(viewsets.ModelViewSet):
                     usuario=usuario_invitado,
                     grupo=grupo,
                     rol=rol,
-                    aceptado=False
+                    aceptado=False,
+                    rechazado=False
                 )
 
                 resultados['invitados_exitosos'].append({
@@ -296,9 +297,42 @@ class GrupoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        invitaciones = UsuarioGrupo.objects.filter(usuario=usuario, aceptado=False)
+        invitaciones = UsuarioGrupo.objects.filter(
+        usuario=usuario, 
+        aceptado=False,
+        rechazado=False,
+    ).select_related('grupo', 'grupo__creador')  # ← Carga los datos relacionados
+        
         serializer = UsuarioGrupoSerializer(invitaciones, many=True)
         return Response(serializer.data)
+    
+        # En views.py - Agrega este endpoint
+    @action(detail=True, methods=['post'])
+    def reject_invitation(self, request, pk=None):
+        """Rechazar invitación a grupo"""
+        usuario = self.get_usuario_from_request()
+        if not usuario:
+            return Response(
+                {"error": "user_email es requerido"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        grupo = self.get_object()
+        try:
+            usuario_grupo = UsuarioGrupo.objects.get(
+                usuario=usuario, 
+                grupo=grupo, 
+                aceptado=False,
+                rechazado=False
+            )
+            usuario_grupo.rechazado = True
+            usuario_grupo.save()
+            return Response({'mensaje': 'Invitación rechazada exitosamente'})
+        except UsuarioGrupo.DoesNotExist:
+            return Response(
+                {'error': 'No tienes una invitación pendiente para este grupo'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
 
     @action(detail=True, methods=['post'])
     def group_pending_invitations(self, request, pk=None):

@@ -1,10 +1,11 @@
+// src/components/TrailDirectory.js
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Container, Row, Col } from 'reactstrap';
 import { useAuth0 } from '@auth0/auth0-react';
 import ReviewsSection from './ReviewsSection';
 import ReturnTimeModal from '../components/ReturnTimeModal';
-import CreateGroupForm from '../components/CreateGroupForm';
+
 // Obtener la URL base desde las variables de entorno
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -19,21 +20,16 @@ const TrailDirectory = () => {
   });
   const [selectedHourlyWeather, setSelectedHourlyWeather] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [drfToken, setDrfToken] = useState(null);  const [trails, setTrails] = useState([]);
+  const [drfToken, setDrfToken] = useState(null);
+  const [trails, setTrails] = useState([]);
   const [loadingTrails, setLoadingTrails] = useState(true);
   
-  // Estados para el sistema de grupos simplificado
-  const [goingSolo, setGoingSolo] = useState(true); // true = solo, false = con grupo
+  // Estados simplificados para grupos
+  const [goingSolo, setGoingSolo] = useState(true);
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
-  const [selectedGroupMembers, setSelectedGroupMembers] = useState([]);
-  const [loadingGroups, setLoadingGroups] = useState(false);  const [showGroupSelector, setShowGroupSelector] = useState(false);
-  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
-  const [showMembersModal, setShowMembersModal] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingGroups, setLoadingGroups] = useState(false);
   
-  // En el estado del componente TrailDirectory
   const [showReturnTimeModal, setShowReturnTimeModal] = useState(false);
   const [lastAppointmentId, setLastAppointmentId] = useState(null);
 
@@ -44,19 +40,18 @@ const TrailDirectory = () => {
   const markersRef = useRef([]);
   const leafletLoadedRef = useRef(false);
 
-  // Función mejorada para obtener rutas desde el backend
+  // Función para obtener rutas desde el backend
   const fetchTrailsFromBackend = async () => {
     try {
-      console.log(' Obteniendo rutas desde el backend...');
+      console.log('🔄 Obteniendo rutas desde el backend...');
       const response = await fetch(`${API_BASE_URL}/trail/rutas/`);
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
       }
 
       const rutasData = await response.json();
-      console.log('Rutas obtenidas:', rutasData);
+      console.log('✅ Rutas obtenidas:', rutasData);
 
-      // Verificar si hay datos y mapearlos correctamente
       if (rutasData && Array.isArray(rutasData)) {
         const formattedTrails = rutasData.map(ruta => ({
           id: ruta.id,
@@ -76,8 +71,7 @@ const TrailDirectory = () => {
       }
 
     } catch (error) {
-      console.error(' Error obteniendo rutas:', error);
-      // Datos de ejemplo como fallback
+      console.error('❌ Error obteniendo rutas:', error);
       const fallbackTrails = [
         {
           id: 1,
@@ -107,13 +101,15 @@ const TrailDirectory = () => {
     }
   };
 
-  // Función para obtener los grupos del usuario
+  // Función simplificada para obtener grupos del usuario
   const fetchUserGroups = async () => {
+    if (!isAuthenticated || !user?.email) return;
+    
     try {
       setLoadingGroups(true);
       console.log('🔄 Obteniendo grupos del usuario...');
       
-      const response = await fetch(`${API_BASE_URL}/groups/grupos/?user_email=${user?.email || ''}`);
+      const response = await fetch(`${API_BASE_URL}/groups/grupos/?user_email=${user.email}`);
       
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}`);
@@ -131,141 +127,8 @@ const TrailDirectory = () => {
       setLoadingGroups(false);
     }
   };
-  // Función para seleccionar un grupo y abrir modal de miembros
-  const selectGroup = async (group) => {
-    try {
-      setSelectedGroup(group);
-      console.log('🔄 Seleccionando grupo:', group.nombre);
-      
-      // Inicializar miembros vacío y mostrar modal para agregar miembros
-      setSelectedGroupMembers([]);
-      setShowGroupSelector(false);
-      setShowMembersModal(true);
-      
-      // Obtener usuarios disponibles para invitar
-      await fetchAvailableUsers();
 
-    } catch (error) {
-      console.error('❌ Error seleccionando grupo:', error);
-      setSelectedGroupMembers([]);
-    }
-  };  // Función para obtener usuarios disponibles
-  const fetchAvailableUsers = async () => {
-    try {
-      setLoadingUsers(true);
-      console.log('🔄 Obteniendo usuarios disponibles...');
-      
-      const response = await fetch(`${API_BASE_URL}/users/`);
-      if (!response.ok) {
-        throw new Error(`Error HTTP ${response.status}`);
-      }
-
-      const usersData = await response.json();
-      console.log('✅ Usuarios obtenidos:', usersData);
-      
-      // Verificar que usersData sea un array, si no, convertirlo o usar array vacío
-      let usersList = [];
-      if (Array.isArray(usersData)) {
-        usersList = usersData;
-      } else if (usersData && typeof usersData === 'object' && usersData.results) {
-        // Si viene con paginación (results)
-        usersList = usersData.results;
-      } else if (usersData && typeof usersData === 'object') {
-        // Si es un objeto individual, convertir a array
-        usersList = [usersData];
-      }
-      
-      // Filtrar usuarios para no incluir al usuario actual
-      // Usar tanto email como correo para compatibilidad
-      const filteredUsers = usersList.filter(u => 
-        u.email !== user?.email && u.correo !== user?.email
-      );
-      
-      console.log('📋 Usuarios filtrados:', filteredUsers);
-      setAvailableUsers(filteredUsers || []);
-
-    } catch (error) {
-      console.error('❌ Error obteniendo usuarios:', error);
-      setAvailableUsers([]);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-  // Función para agregar miembro al grupo
-  const addMemberToGroup = async (userToAdd) => {
-    try {
-      const userEmail = userToAdd.correo || userToAdd.email;
-      console.log('🔄 Agregando miembro al grupo:', userEmail);
-      
-      const response = await fetch(`${API_BASE_URL}/groups/grupos/${selectedGroup.id}/members/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_email: userEmail
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP ${response.status}`);
-      }
-
-      // Agregar usuario a la lista de miembros seleccionados
-      setSelectedGroupMembers(prev => [...prev, userToAdd]);
-      console.log('✅ Miembro agregado exitosamente');
-
-    } catch (error) {
-      console.error('❌ Error agregando miembro:', error);
-      alert('Error agregando miembro al grupo');
-    }
-  };
-
-  // Función para remover miembro del grupo
-  const removeMemberFromGroup = (memberEmail) => {
-    setSelectedGroupMembers(prev => prev.filter(member => 
-      (member.correo || member.email) !== memberEmail
-    ));
-  };
-
-  // Función para crear un nuevo grupo
-  const createNewGroup = async (groupData) => {
-    try {
-      console.log('🔄 Creando nuevo grupo:', groupData);
-      
-      const response = await fetch(`${API_BASE_URL}/groups/grupos/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...groupData,
-          user_email: user?.email
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP ${response.status}`);
-      }
-
-      const newGroup = await response.json();
-      console.log('✅ Grupo creado:', newGroup);
-
-      // Actualizar la lista de grupos
-      await fetchUserGroups();
-      
-      // Seleccionar automáticamente el nuevo grupo
-      await selectGroup(newGroup);
-      
-      setShowCreateGroupModal(false);
-      
-      return newGroup;
-
-    } catch (error) {
-      console.error('❌ Error creando grupo:', error);
-      throw error;
-    }
-  };  // FUNCIÓN MEJORADA para inicializar el mapa
+  // FUNCIÓN MEJORADA para inicializar el mapa
   const initializeMap = async (rutas) => {
     if (typeof window === 'undefined' || !mapRef.current || rutas.length === 0) {
       console.log('⚠️ Condiciones no cumplidas para inicializar mapa');
@@ -317,7 +180,9 @@ const TrailDirectory = () => {
       // Limpiar mapa existente
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
-      }      // Crear nuevo mapa con timeout y validaciones mejoradas
+      }
+
+      // Crear nuevo mapa con timeout y validaciones mejoradas
       setTimeout(() => {
         try {
           // Verificar que el elemento DOM esté disponible
@@ -389,16 +254,16 @@ const TrailDirectory = () => {
       }, 500);
 
     } catch (error) {
-      console.error(' Error loading Leaflet:', error);
+      console.error('❌ Error loading Leaflet:', error);
     }
   };
 
   // FUNCIÓN SIMPLIFICADA - Ya no necesitamos token JWT para citas
   const obtenerTokenJWT = async () => {
     try {
-      console.log(' Configurando autenticación...');
+      console.log('🔐 Configurando autenticación...');
       const auth0Token = await getAccessTokenSilently();
-      console.log(' Token Auth0 obtenido (para futuros usos)');
+      console.log('✅ Token Auth0 obtenido (para futuros usos)');
 
       setDrfToken(auth0Token);
       localStorage.setItem('drf_token', auth0Token);
@@ -406,7 +271,7 @@ const TrailDirectory = () => {
       return auth0Token;
 
     } catch (error) {
-      console.error(' Error obteniendo token:', error);
+      console.error('❌ Error obteniendo token:', error);
       throw error;
     }
   };
@@ -502,12 +367,12 @@ const TrailDirectory = () => {
           const savedToken = localStorage.getItem('drf_token');
           if (savedToken) {
             setDrfToken(savedToken);
-            console.log(' Usando token guardado');
+            console.log('🔑 Usando token guardado');
           } else {
             await obtenerTokenJWT();
           }
         } catch (error) {
-          console.error(' Error inicializando autenticación:', error);
+          console.error('❌ Error inicializando autenticación:', error);
         }
       }
     };
@@ -515,7 +380,7 @@ const TrailDirectory = () => {
     initializeAuth();
   }, [isAuthenticated, user]);
 
-  //  Cargar rutas cuando el componente se monte
+  // Cargar rutas cuando el componente se monte
   useEffect(() => {
     const loadTrails = async () => {
       const rutas = await fetchTrailsFromBackend();
@@ -525,7 +390,6 @@ const TrailDirectory = () => {
     loadTrails();
   }, []);
 
-  //  Cargar TODOS los usuarios cuando el usuario se autentique
   // Auto-seleccionar ruta si viene desde RutasSenderismo (query params lat/lon o id)
   useEffect(() => {
     if (trails.length > 0) {
@@ -557,7 +421,10 @@ const TrailDirectory = () => {
         handleTrailSelect(matchedTrail);
       }
     }
-  }, [trails, searchParams, selectedTrail]);  useEffect(() => {
+  }, [trails, searchParams, selectedTrail]);
+
+  // Cargar grupos cuando el usuario se autentique
+  useEffect(() => {
     if (isAuthenticated && user) {
       fetchUserGroups();
     }
@@ -578,6 +445,7 @@ const TrailDirectory = () => {
       }
     };
   }, []);
+
   // Manejar selección de ruta
   const handleTrailSelect = async (trail) => {
     try {
@@ -643,10 +511,10 @@ const TrailDirectory = () => {
     });
   };
 
-  //  Manejar agendamiento de cita ACTUALIZADO
+  // Manejar agendamiento de cita ACTUALIZADO
   const handleScheduleAppointment = async () => {
     if (!isAuthenticated) {
-      alert(" Primero debes iniciar sesión antes de agendar una cita.");
+      alert("🔐 Primero debes iniciar sesión antes de agendar una cita.");
       loginWithRedirect();
       return;
     }
@@ -673,42 +541,45 @@ const TrailDirectory = () => {
         compania: null
       };
 
-      console.log(' Datos de la cita:', appointmentData);     const result = await enviarCitaAlBackend(appointmentData);
+      console.log('📅 Datos de la cita:', appointmentData);
+      const result = await enviarCitaAlBackend(appointmentData);
 
-     setLastAppointmentId(result.id);
+      setLastAppointmentId(result.id);
 
       // Mensaje personalizado según modalidad
       const mensaje = goingSolo 
         ? "✅ Cita agendada correctamente - Modo individual!" 
         : `✅ Cita agendada correctamente - Con grupo "${selectedGroup?.nombre}"!`;
       
-      // alert(mensaje);
+      alert(mensaje);
 
       // Resetear formulario
-
       setSelectedDateTime({ date: '', time: '' });
       setSelectedHourlyWeather(null);
       setSelectedGroup(null);
-      setSelectedGroupMembers([]);
-      setShowGroupSelector(false);
 
-       // Mostrar modal para horario de retorno
-    setTimeout(() => {
-      setShowReturnTimeModal(true);
-    }, 1000);
+      // Mostrar modal para horario de retorno
+      setTimeout(() => {
+        setShowReturnTimeModal(true);
+      }, 1000);
 
     } catch (err) {
-      console.error(' Error al agendar cita:', err);
-      alert(` Error al agendar cita: ${err.message}`);
+      console.error('❌ Error al agendar cita:', err);
+      alert(`❌ Error al agendar cita: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   // Función para manejar el éxito del horario de retorno
-const handleReturnTimeSuccess = (result) => {
-  console.log('Horario de retorno guardado:', result);
-};
+  const handleReturnTimeSuccess = (result) => {
+    console.log('✅ Horario de retorno guardado:', result);
+  };
+
+  // Función para redirigir a gestión de grupos
+  const redirectToGroups = () => {
+    window.location.href = '/my-groups';
+  };
 
   return (
     <div>
@@ -1017,162 +888,157 @@ const handleReturnTimeSuccess = (result) => {
                       )}
                     </div>
 
-                    {/* ✅ NUEVA SECCIÓN: Selección de amigos (todos los usuarios) */}
+                    {/* ✅ SECCIÓN SIMPLIFICADA: Solo selección de modalidad */}
                     <div style={{
                       background: 'linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%)',
                       borderRadius: '10px',
                       padding: '14px',
                       border: '1px solid #e0e0e0',
                       marginTop: '16px'
-                    }}>                      {/* Sistema simplificado: Solo vs Con grupo */}
-                      <div style={{ marginBottom: '16px' }}>
-                        <p style={{
-                          color: '#1b1b1b',
-                          fontWeight: '600',
-                          margin: '0 0 12px 0',
-                          fontSize: '1rem'
-                        }}>
-                          Modalidad del sendero:
-                        </p>
+                    }}>
+                      <p style={{
+                        color: '#1b1b1b',
+                        fontWeight: '600',
+                        margin: '0 0 12px 0',
+                        fontSize: '1rem'
+                      }}>
+                        Modalidad del sendero:
+                      </p>
+                      
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
+                          <input
+                            type="radio"
+                            name="modalidad"
+                            checked={goingSolo}
+                            onChange={() => {
+                              setGoingSolo(true);
+                              setSelectedGroup(null);
+                            }}
+                            style={{ marginRight: '8px' }}
+                          />
+                          <span style={{ fontWeight: '500' }}>Ir solo 🚶‍♂️</span>
+                        </label>
                         
-                        <div style={{ marginBottom: '12px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '8px' }}>
-                            <input
-                              type="radio"
-                              name="modalidad"
-                              checked={goingSolo}
-                              onChange={() => setGoingSolo(true)}
-                              style={{ marginRight: '8px' }}
-                            />
-                            <span style={{ fontWeight: '500' }}>Ir solo 🚶‍♂️</span>
-                          </label>
-                          
-                          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                            <input
-                              type="radio"
-                              name="modalidad"
-                              checked={!goingSolo}
-                              onChange={() => setGoingSolo(false)}
-                              style={{ marginRight: '8px' }}
-                            />
-                            <span style={{ fontWeight: '500' }}>Con mi grupo 👥</span>
-                          </label>
-                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="modalidad"
+                            checked={!goingSolo}
+                            onChange={() => setGoingSolo(false)}
+                            style={{ marginRight: '8px' }}
+                          />
+                          <span style={{ fontWeight: '500' }}>Con mi grupo 👥</span>
+                        </label>
+                      </div>
 
-                        {/* Selector de grupo cuando no va solo */}
-                        {!goingSolo && (
+                      {/* Selector simple de grupo cuando no va solo */}
+                      {!goingSolo && (
+                        <div style={{
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '8px',
+                          padding: '12px',
+                          backgroundColor: '#f8f9fa'
+                        }}>
                           <div style={{
-                            border: '1px solid #e0e0e0',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            backgroundColor: '#f8f9fa'
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px'
                           }}>
-                            <div style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              marginBottom: '8px'
-                            }}>
-                              <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                Seleccionar grupo:
-                              </span>
-                              <div>
-                                <button
-                                  onClick={() => setShowGroupSelector(!showGroupSelector)}
-                                  style={{
-                                    backgroundColor: 'transparent',
-                                    color: '#2e7d32',
-                                    border: '1px solid #2e7d32',
-                                    padding: '4px 8px',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '0.75rem',
-                                    marginRight: '6px'
-                                  }}
-                                >
-                                  {showGroupSelector ? 'Ocultar' : 'Ver grupos'}
-                                </button>
-                                <button
-                                  onClick={() => setShowCreateGroupModal(true)}
-                                  style={{
-                                    backgroundColor: '#2e7d32',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '4px 8px',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '0.75rem'
-                                  }}
-                                >
-                                  Crear grupo
-                                </button>
-                              </div>
-                            </div>
-
-                            {selectedGroup && (
-                              <div style={{
-                                backgroundColor: '#e8f5e8',
-                                padding: '8px',
+                            <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>
+                              Seleccionar grupo:
+                            </span>
+                            <button
+                              onClick={redirectToGroups}
+                              style={{
+                                backgroundColor: '#2e7d32',
+                                color: 'white',
+                                border: 'none',
+                                padding: '6px 12px',
                                 borderRadius: '4px',
-                                marginBottom: '8px'
-                              }}>
-                                <div style={{ fontWeight: '600', fontSize: '0.85rem' }}>
-                                  ✅ {selectedGroup.nombre}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: '#666' }}>
-                                  {selectedGroup.descripcion || 'Sin descripción'}
-                                </div>
-                                {selectedGroupMembers.length > 0 && (
-                                  <div style={{ fontSize: '0.75rem', color: '#2e7d32', marginTop: '4px' }}>
-                                    👥 {selectedGroupMembers.length} miembro(s)
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                cursor: 'pointer',
+                                fontSize: '0.8rem'
+                              }}
+                            >
+                              Gestionar Grupos
+                            </button>
+                          </div>
 
-                            {showGroupSelector && (
-                              <div style={{
-                                maxHeight: '150px',
-                                overflowY: 'auto',
+                          {loadingGroups ? (
+                            <div style={{ textAlign: 'center', padding: '8px' }}>
+                              <div className="spinner-border spinner-border-sm text-success" role="status"></div>
+                              <span style={{ marginLeft: '8px', fontSize: '0.8rem' }}>Cargando grupos...</span>
+                            </div>
+                          ) : groups.length > 0 ? (
+                            <select
+                              value={selectedGroup?.id || ''}
+                              onChange={(e) => {
+                                const groupId = e.target.value;
+                                const group = groups.find(g => g.id === parseInt(groupId));
+                                setSelectedGroup(group);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '8px',
                                 border: '1px solid #e0e0e0',
                                 borderRadius: '4px',
-                                backgroundColor: 'white'
-                              }}>
-                                {loadingGroups ? (
-                                  <div style={{ textAlign: 'center', padding: '12px' }}>
-                                    <div className="spinner-border spinner-border-sm text-success" role="status"></div>
-                                    <span style={{ marginLeft: '8px', fontSize: '0.8rem' }}>Cargando grupos...</span>
-                                  </div>
-                                ) : groups.length > 0 ? (
-                                  groups.map(group => (
-                                    <div
-                                      key={group.id}
-                                      onClick={() => selectGroup(group)}
-                                      style={{
-                                        padding: '8px',
-                                        borderBottom: '1px solid #f0f0f0',
-                                        cursor: 'pointer',
-                                        backgroundColor: selectedGroup?.id === group.id ? '#e8f5e8' : 'transparent'
-                                      }}
-                                    >
-                                      <div style={{ fontWeight: '600', fontSize: '0.8rem' }}>
-                                        {group.nombre}
-                                      </div>
-                                      <div style={{ fontSize: '0.7rem', color: '#666' }}>
-                                        {group.descripcion || 'Sin descripción'}
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div style={{ textAlign: 'center', padding: '12px', fontSize: '0.8rem', color: '#666' }}>
-                                    No tienes grupos. ¡Crea tu primer grupo!
-                                  </div>
-                                )}
+                                backgroundColor: 'white',
+                                fontSize: '0.9rem'
+                              }}
+                            >
+                              <option value="">Selecciona un grupo...</option>
+                              {groups.map(group => (
+                                <option key={group.id} value={group.id}>
+                                  {group.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div style={{
+                              textAlign: 'center',
+                              padding: '12px',
+                              backgroundColor: '#fff3cd',
+                              border: '1px solid #ffeaa7',
+                              borderRadius: '4px'
+                            }}>
+                              <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#856404' }}>
+                                No tienes grupos creados
+                              </p>
+                              <button
+                                onClick={redirectToGroups}
+                                style={{
+                                  backgroundColor: '#2e7d32',
+                                  color: 'white',
+                                  border: 'none',
+                                  padding: '6px 12px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem'
+                                }}
+                              >
+                                Crear Mi Primer Grupo
+                              </button>
+                            </div>
+                          )}
+
+                          {selectedGroup && (
+                            <div style={{
+                              backgroundColor: '#e8f5e8',
+                              padding: '8px',
+                              borderRadius: '4px',
+                              marginTop: '8px'
+                            }}>
+                              <div style={{ fontWeight: '600', fontSize: '0.85rem' }}>
+                                ✅ {selectedGroup.nombre}
                               </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                              <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                                {selectedGroup.descripcion || 'Sin descripción'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <button
@@ -1255,15 +1121,16 @@ const handleReturnTimeSuccess = (result) => {
           </Col>
         </Row>
       </Container>
-<ReturnTimeModal
-  isOpen={showReturnTimeModal}
-  toggle={() => setShowReturnTimeModal(false)}
-  citaId={lastAppointmentId}
-  userEmail={user?.email}
-  onSuccess={handleReturnTimeSuccess}
-  appointmentDateTime={selectedDateTime.date && selectedDateTime.time ? 
-    `${selectedDateTime.date}T${selectedDateTime.time}:00` : null}
-/>
+
+      <ReturnTimeModal
+        isOpen={showReturnTimeModal}
+        toggle={() => setShowReturnTimeModal(false)}
+        citaId={lastAppointmentId}
+        userEmail={user?.email}
+        onSuccess={handleReturnTimeSuccess}
+        appointmentDateTime={selectedDateTime.date && selectedDateTime.time ? 
+          `${selectedDateTime.date}T${selectedDateTime.time}:00` : null}
+      />
 
       <style jsx>{`
         .container-mapa {
@@ -1329,281 +1196,9 @@ const handleReturnTimeSuccess = (result) => {
         :global(.leaflet-popup-content) {
           font-weight: 500;
           color: #1b1b1b;
-          font-size: 0.85rem;        }
+          font-size: 0.85rem;
+        }
       `}</style>
-
-      {/* Modal para crear grupo */}      {showCreateGroupModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-            width: '90%',
-            maxWidth: '400px'
-          }}>
-            <h3 style={{ marginBottom: '16px', color: '#2e7d32' }}>Crear Nuevo Grupo</h3>
-            <CreateGroupForm
-              onSubmit={createNewGroup}
-              onCancel={() => setShowCreateGroupModal(false)}
-              userEmail={user?.email}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Modal para agregar miembros al grupo */}
-      {showMembersModal && selectedGroup && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '24px',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-            width: '90%',
-            maxWidth: '600px',
-            maxHeight: '80vh',
-            overflow: 'auto'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '20px'
-            }}>
-              <h3 style={{ color: '#2e7d32', margin: 0 }}>
-                Miembros del grupo "{selectedGroup.nombre}"
-              </h3>
-              <button
-                onClick={() => {
-                  setShowMembersModal(false);
-                  setSelectedGroup(null);
-                  setSelectedGroupMembers([]);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#666',
-                  padding: '0'
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Sección para mostrar miembros actuales */}
-            <div style={{ marginBottom: '24px' }}>
-              <h4 style={{ color: '#333', marginBottom: '12px' }}>
-                Miembros seleccionados ({selectedGroupMembers.length})
-              </h4>
-              {selectedGroupMembers.length === 0 ? (
-                <p style={{ color: '#666', fontStyle: 'italic' }}>
-                  No hay miembros seleccionados aún
-                </p>
-              ) : (
-                <div style={{ 
-                  display: 'flex', 
-                  flexWrap: 'wrap', 
-                  gap: '8px',
-                  marginBottom: '16px'
-                }}>                  {selectedGroupMembers.map((member, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        backgroundColor: '#e8f5e8',
-                        color: '#2e7d32',
-                        padding: '6px 12px',
-                        borderRadius: '16px',
-                        fontSize: '0.9rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      {member.nombre || member.username || (member.correo || member.email)}
-                      <button
-                        onClick={() => removeMemberFromGroup(member.correo || member.email)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#2e7d32',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          padding: '0',
-                          marginLeft: '4px'
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Sección para agregar nuevos miembros */}
-            <div style={{ marginBottom: '20px' }}>
-              <h4 style={{ color: '#333', marginBottom: '12px' }}>
-                Agregar miembros
-              </h4>
-              
-              {/* SECCIÓN COMENTADA PARA FUTURA FUNCIONALIDAD DE AMIGOS */}
-              {/* 
-              TODO: Cuando la funcionalidad de amigos esté implementada, 
-              reemplazar la lista de todos los usuarios por una lista de amigos del usuario actual.
-              
-              Funcionalidades pendientes:
-              - Sistema de amistad (enviar/aceptar solicitudes)
-              - Lista de amigos del usuario
-              - Búsqueda de amigos por nombre/email
-              - Estado de amistad (pendiente, aceptado, bloqueado)
-              
-              const fetchUserFriends = async () => {
-                const response = await fetch(`${API_BASE_URL}/users/${user.id}/friends/`);
-                const friends = await response.json();
-                setAvailableUsers(friends);
-              };
-              */}
-
-              {loadingUsers ? (
-                <div style={{ 
-                  textAlign: 'center', 
-                  color: '#666',
-                  padding: '20px'
-                }}>
-                  Cargando usuarios...
-                </div>
-              ) : availableUsers.length === 0 ? (
-                <p style={{ color: '#666', fontStyle: 'italic' }}>
-                  No hay usuarios disponibles
-                </p>
-              ) : (
-                <div style={{
-                  maxHeight: '200px',
-                  overflowY: 'auto',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '6px'
-                }}>                  {availableUsers.map((user_item, index) => {
-                    // Usar correo como campo principal de email, con fallback a email
-                    const userEmail = user_item.correo || user_item.email;
-                    const isAlreadyMember = selectedGroupMembers.some(
-                      member => (member.correo || member.email) === userEmail
-                    );
-                    
-                    return (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '12px 16px',
-                          borderBottom: index < availableUsers.length - 1 ? '1px solid #f0f0f0' : 'none',
-                          backgroundColor: isAlreadyMember ? '#f5f5f5' : 'white'
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: '500', color: '#333' }}>
-                            {user_item.nombre || user_item.username || user_item.first_name || 'Usuario'}
-                          </div>
-                          <div style={{ fontSize: '0.8rem', color: '#666' }}>
-                            {userEmail}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => addMemberToGroup(user_item)}
-                          disabled={isAlreadyMember}
-                          style={{
-                            backgroundColor: isAlreadyMember ? '#ccc' : '#2e7d32',
-                            color: 'white',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            cursor: isAlreadyMember ? 'not-allowed' : 'pointer',
-                            fontSize: '0.8rem',
-                            fontWeight: '500'
-                          }}
-                        >
-                          {isAlreadyMember ? 'Agregado' : 'Agregar'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Botones de acción */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => {
-                  setShowMembersModal(false);
-                  setSelectedGroup(null);
-                  setSelectedGroupMembers([]);
-                }}
-                style={{
-                  backgroundColor: 'transparent',
-                  color: '#666',
-                  border: '1px solid #ccc',
-                  padding: '10px 20px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.9rem'
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  setShowMembersModal(false);
-                  // El grupo ya está seleccionado y los miembros están en selectedGroupMembers
-                }}
-                style={{
-                  backgroundColor: '#2e7d32',
-                  color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.9rem'
-                }}
-              >
-                Confirmar ({selectedGroupMembers.length} miembros)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

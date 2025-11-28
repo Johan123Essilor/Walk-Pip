@@ -15,6 +15,8 @@ class UsuarioGrupo(models.Model):
     grupo = models.ForeignKey(Grupo, on_delete=models.CASCADE)
     rol = models.CharField(max_length=50)
     aceptado = models.BooleanField(default=False)
+    rechazado = models.BooleanField(default=False)  # ← NUEVO CAMPO
+    fecha_invitacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'usuario_grupo'

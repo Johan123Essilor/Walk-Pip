@@ -19,7 +19,7 @@ class SesionActividadViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar sesiones de actividad (iniciar, detener, listar).
     """
     serializer_class = SesionActividadSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
@@ -109,7 +109,7 @@ class SesionActividadViewSet(viewsets.ModelViewSet):
 class MetricaCaminataViewSet(viewsets.ModelViewSet):
     queryset = MetricaCaminata.objects.all()
     serializer_class = MetricaCaminataSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save()
@@ -118,7 +118,7 @@ class MetricaCaminataViewSet(viewsets.ModelViewSet):
 class MetricaCorazonViewSet(viewsets.ModelViewSet):
     queryset = MetricaCorazon.objects.all()
     serializer_class = MetricaCorazonSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save()

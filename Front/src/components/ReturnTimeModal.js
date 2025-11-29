@@ -1,23 +1,59 @@
 // src/components/ReturnTimeModal.js
-import React, { useState } from 'react';
-import { Modal, ModalHeader, ModalBody, ModalFooter, Button, Alert, Spinner } from 'reactstrap';
+import React, { useState, useEffect } from 'react';
+import { Modal, ModalHeader, ModalBody, ModalFooter, Button, Alert, Spinner, FormGroup, Label, Input } from 'reactstrap';
+import emergencyContactService from '../services/emergencyContactService';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appointmentDateTime }) => {
   const [startTime, setStartTime] = useState('');
   const [returnTime, setReturnTime] = useState('');
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [emergencyContacts, setEmergencyContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Cargar contactos de emergencia cuando se abre el modal
+  useEffect(() => {
+    if (isOpen && userEmail) {
+      fetchEmergencyContacts();
+    }
+  }, [isOpen, userEmail]);
 
   // Extraer la hora de la fecha de la cita si está disponible
   const getDefaultStartTime = () => {
     if (appointmentDateTime) {
       const date = new Date(appointmentDateTime);
-      return date.toTimeString().slice(0, 5); // Formato HH:MM
+      return date.toTimeString().slice(0, 5);
     }
     return '';
+  };
+
+  // Función para obtener contactos de emergencia usando el servicio
+  const fetchEmergencyContacts = async () => {
+    try {
+      setLoadingContacts(true);
+      console.log('🔄 Obteniendo contactos de emergencia...');
+      
+      const contactsData = await emergencyContactService.getEmergencyContacts(userEmail);
+      console.log('✅ Contactos obtenidos:', contactsData);
+      
+      setEmergencyContacts(contactsData || []);
+
+    } catch (error) {
+      console.error('❌ Error obteniendo contactos:', error);
+      setError('No se pudieron cargar los contactos de emergencia');
+      setEmergencyContacts([]);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  // Manejar selección de contacto (solo uno)
+  const handleContactSelect = (contactId) => {
+    setSelectedContact(contactId);
   };
 
   const handleSubmit = async () => {
@@ -51,6 +87,7 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
           cita: citaId,
           hora_inicio: startTime,
           hora_retorno: returnTime,
+          contacto: selectedContact, // ✅ CORREGIDO: 'contacto' en lugar de 'contacto_id'
           user_email: userEmail
         })
       });
@@ -62,7 +99,14 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
 
       const result = await response.json();
       setSuccess('¡Horario de retorno guardado exitosamente!');
-      alert('Cita guardada exitosamente.');
+      
+      // Mostrar mensaje personalizado
+      const selectedContactInfo = emergencyContacts.find(c => c.id === selectedContact);
+      const contactMessage = selectedContact 
+        ? `Se notificará a ${selectedContactInfo?.nombre_contacto} si no regresas a tiempo.`
+        : 'No se seleccionó ningún contacto de emergencia para notificar.';
+      
+      alert(`Cita guardada exitosamente. ${contactMessage}`);
       
       // Notificar al componente padre
       setTimeout(() => {
@@ -70,6 +114,7 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
         toggle();
         setStartTime('');
         setReturnTime('');
+        setSelectedContact(null);
       }, 1500);
 
     } catch (err) {
@@ -83,13 +128,14 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
   const handleClose = () => {
     setStartTime('');
     setReturnTime('');
+    setSelectedContact(null);
     setError('');
     setSuccess('');
     toggle();
   };
 
   return (
-    <Modal isOpen={isOpen} toggle={handleClose}>
+    <Modal isOpen={isOpen} toggle={handleClose} size="lg">
       <ModalHeader toggle={handleClose}>
         <i className="fa fa-clock me-2"></i>
         Registrar Horarios de la Ruta
@@ -98,7 +144,8 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
         {error && <Alert color="danger">{error}</Alert>}
         {success && <Alert color="success">{success}</Alert>}
 
-        <div className="row">
+        {/* Sección de horarios */}
+        <div className="row mb-4">
           <div className="col-md-6 mb-3">
             <label htmlFor="startTime" className="form-label fw-bold">
               Hora de inicio *
@@ -136,7 +183,7 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
 
         {/* Mostrar duración estimada */}
         {startTime && returnTime && (
-          <div className="alert alert-info">
+          <div className="alert alert-info mb-4">
             <div className="d-flex justify-content-between align-items-center">
               <span>
                 <i className="fa fa-calendar me-2"></i>
@@ -149,11 +196,90 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
           </div>
         )}
 
+        {/* Sección de contactos de emergencia - SOLO UNO */}
+        <div className="mb-4">
+          <h6 className="mb-3">
+            <i className="fa fa-address-book me-2"></i>
+            Contacto de Emergencia
+          </h6>
+
+          {loadingContacts ? (
+            <div className="text-center py-3">
+              <Spinner size="sm" color="primary" />
+              <span className="ms-2">Cargando contactos...</span>
+            </div>
+          ) : emergencyContacts.length === 0 ? (
+            <Alert color="warning">
+              <i className="fa fa-exclamation-triangle me-2"></i>
+              No tienes contactos de emergencia registrados. 
+              <br />
+              <small>
+                Agrega contactos en tu perfil para recibir notificaciones de seguridad.
+              </small>
+            </Alert>
+          ) : (
+            <div className="contacts-list" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {emergencyContacts.map((contact) => (
+                <FormGroup check key={contact.id} className="mb-2 p-2 border rounded">
+                  <Label check className="w-100">
+                    <Input
+                      type="radio"
+                      name="emergencyContact"
+                      checked={selectedContact === contact.id}
+                      onChange={() => handleContactSelect(contact.id)}
+                      disabled={submitting}
+                    />
+                    <div className="ms-2">
+                      <strong>{contact.nombre_contacto}</strong>
+                      <br />
+                      <small className="text-muted">
+                        {contact.telefono} 
+                        {contact.parentesco && ` • ${contact.parentesco}`}
+                        {contact.correo && ` • ${contact.correo}`}
+                      </small>
+                    </div>
+                  </Label>
+                </FormGroup>
+              ))}
+            </div>
+          )}
+
+          {selectedContact && (
+            <div className="mt-2">
+              <small className="text-success">
+                <i className="fa fa-check-circle me-1"></i>
+                Contacto seleccionado para notificación
+              </small>
+            </div>
+          )}
+
+          {/* Opción para no seleccionar contacto */}
+          <FormGroup check className="mt-3 p-2 border rounded">
+            <Label check className="w-100">
+              <Input
+                type="radio"
+                name="emergencyContact"
+                checked={selectedContact === null}
+                onChange={() => setSelectedContact(null)}
+                disabled={submitting}
+              />
+              <div className="ms-2">
+                <strong>No seleccionar contacto de emergencia</strong>
+                <br />
+                <small className="text-muted">
+                  No recibirás notificaciones de seguridad en esta ruta
+                </small>
+              </div>
+            </Label>
+          </FormGroup>
+        </div>
+
+        {/* Información adicional */}
         <div className="alert alert-info">
           <small>
             <i className="fa fa-info-circle me-2"></i>
-            Esta información nos ayuda a calcular la duración de tu actividad 
-            y mejorar nuestro servicio
+            <strong>Sistema de seguridad:</strong> Si no registras tu retorno antes de la hora estimada, 
+            se enviará una notificación automática al contacto seleccionado.
           </small>
         </div>
       </ModalBody>
@@ -172,7 +298,10 @@ const ReturnTimeModal = ({ isOpen, toggle, citaId, userEmail, onSuccess, appoint
               Guardando...
             </>
           ) : (
-            'Guardar Horarios'
+            <>
+              <i className="fa fa-save me-2"></i>
+              Guardar Horarios
+            </>
           )}
         </Button>
       </ModalFooter>
@@ -188,7 +317,7 @@ const calculateDuration = (startTime, endTime) => {
   let totalMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
   
   if (totalMinutes < 0) {
-    totalMinutes += 24 * 60; // Si cruza la medianoche
+    totalMinutes += 24 * 60;
   }
   
   const hours = Math.floor(totalMinutes / 60);

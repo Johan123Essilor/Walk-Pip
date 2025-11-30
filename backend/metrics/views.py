@@ -3,6 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils.timezone import now
+from django.db.models import Sum
+from datetime import timedelta
 from .models import Cita, MetricaCorazon, SesionActividad, MetricaCaminata
 from users.models import Usuario
 from .serializers import (
@@ -110,15 +112,179 @@ class MetricaCaminataViewSet(viewsets.ModelViewSet):
     queryset = MetricaCaminata.objects.all()
     serializer_class = MetricaCaminataSerializer
     #permission_classes = [IsAuthenticated]
-
     def perform_create(self, serializer):
         serializer.save()
+
+    # Sobrescribir list para aceptar ?time_range=1h|6h|24h y devolver datos formateados para gráficas
+    def list(self, request, *args, **kwargs):
+        time_range = request.query_params.get('time_range')
+        qs = self.queryset
+
+        if time_range:
+            mapping = {'1h': 1, '6h': 6, '24h': 24}
+            hours = mapping.get(time_range.lower())
+            if hours:
+                cutoff = now() - timedelta(hours=hours)
+                qs = qs.filter(sesion__fecha_hora_inicio__gte=cutoff)
+
+        qs = qs.select_related('sesion').order_by('-sesion__fecha_hora_inicio')  # Más recientes primero
+
+        data = []
+        for item in qs:
+            hora = None
+            try:
+                hora = item.sesion.fecha_hora_inicio.isoformat()
+            except Exception:
+                hora = None
+
+            data.append({
+                'id': item.id,
+                'hora': hora,
+                'km_recorridos': float(item.km_recorridos),
+                'pasos': item.pasos,
+                'tiempo_actividad': str(item.tiempo_actividad),
+                'velocidad_promedio': float(item.velocidad_promedio),
+                'calorias_quemadas': float(item.calorias_quemadas),
+                'sesion': item.sesion.id if item.sesion else None
+            })
+
+        return Response(data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'])
+    def latest(self, request):
+        """
+        Obtener el último registro de caminata
+        """
+        try:
+            latest_metric = self.get_queryset().last()
+            if not latest_metric:
+                return Response({"error": "No hay datos disponibles"}, status=status.HTTP_404_NOT_FOUND)
+            
+            data = {
+                'id': latest_metric.id,
+                'km_recorridos': float(latest_metric.km_recorridos),
+                'pasos': latest_metric.pasos,
+                'tiempo_actividad': str(latest_metric.tiempo_actividad),
+                'velocidad_promedio': float(latest_metric.velocidad_promedio),
+                'calorias_quemadas': float(latest_metric.calorias_quemadas),
+                'sesion': latest_metric.sesion.id if latest_metric.sesion else None
+            }
+            return Response(data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'])
+    def session_stats(self, request):
+        """
+        Obtener estadísticas de la sesión actual
+        """
+        try:
+            # Obtener la sesión activa del usuario
+            usuario = request.user
+            if not usuario.is_authenticated:
+                return Response({"detalle": "Usuario no autenticado."}, status=status.HTTP_401_UNAUTHORIZED)
+
+            sesion_activa = SesionActividad.objects.filter(
+                usuario=usuario, 
+                fecha_hora_fin__isnull=True
+            ).first()
+
+            if not sesion_activa:
+                return Response({"error": "No hay sesión activa"}, status=status.HTTP_404_NOT_FOUND)
+
+            # Métricas de la sesión activa
+            metricas_caminata = self.get_queryset().filter(sesion=sesion_activa)
+            metricas_corazon = MetricaCorazon.objects.filter(sesion=sesion_activa)
+
+            # Calcular estadísticas
+            total_pasos = metricas_caminata.aggregate(Sum('pasos'))['pasos__sum'] or 0
+            total_calorias = metricas_caminata.aggregate(Sum('calorias_quemadas'))['calorias_quemadas__sum'] or 0
+            total_km = metricas_caminata.aggregate(Sum('km_recorridos'))['km_recorridos__sum'] or 0
+
+            # Duración de la sesión
+            duracion_segundos = 0
+            if sesion_activa.fecha_hora_inicio:
+                tiempo_transcurrido = now() - sesion_activa.fecha_hora_inicio
+                duracion_segundos = int(tiempo_transcurrido.total_seconds())
+
+            # Estadísticas de corazón
+            ritmos = metricas_corazon.values_list('ritmo_cardiaco', flat=True)
+            oxigenaciones = metricas_corazon.values_list('oxigenacion', flat=True)
+
+            stats = {
+                'session_duration': duracion_segundos,
+                'data_count': metricas_caminata.count() + metricas_corazon.count(),
+                'total_pasos': total_pasos,
+                'total_calorias': total_calorias,
+                'total_km': total_km,
+                'max_ritmo': max(ritmos) if ritmos else 0,
+                'min_ritmo': min(ritmos) if ritmos else 0,
+                'max_oxigenacion': float(max(oxigenaciones)) if oxigenaciones else 0,
+                'min_oxigenacion': float(min(oxigenaciones)) if oxigenaciones else 0,
+                'sesion_id': sesion_activa.id,
+                'inicio_sesion': sesion_activa.fecha_hora_inicio.isoformat() if sesion_activa.fecha_hora_inicio else None
+            }
+
+            return Response(stats)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class MetricaCorazonViewSet(viewsets.ModelViewSet):
     queryset = MetricaCorazon.objects.all()
     serializer_class = MetricaCorazonSerializer
     #permission_classes = [IsAuthenticated]
-
     def perform_create(self, serializer):
         serializer.save()
+
+    # Sobrescribir list para aceptar ?time_range=1h|6h|24h y devolver datos formateados para gráficas
+    def list(self, request, *args, **kwargs):
+        time_range = request.query_params.get('time_range')
+        qs = self.queryset
+
+        if time_range:
+            mapping = {'1h': 1, '6h': 6, '24h': 24}
+            hours = mapping.get(time_range.lower())
+            if hours:
+                cutoff = now() - timedelta(hours=hours)
+                qs = qs.filter(sesion__fecha_hora_inicio__gte=cutoff)
+
+        qs = qs.select_related('sesion').order_by('-fecha', '-hora')  # Más recientes primero
+
+        data = []
+        for item in qs:
+            data.append({
+                'id': item.id,
+                'fecha': item.fecha.isoformat() if item.fecha else None,
+                'hora': item.hora.strftime('%H:%M:%S') if item.hora else None,
+                'ritmo_cardiaco': item.ritmo_cardiaco,
+                'presion': item.presion,
+                'oxigenacion': float(item.oxigenacion),
+                'sesion': item.sesion.id if item.sesion else None
+            })
+
+        return Response(data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'])
+    def latest(self, request):
+        """
+        Obtener el último registro de corazón
+        """
+        try:
+            latest_metric = self.get_queryset().last()
+            if not latest_metric:
+                return Response({"error": "No hay datos disponibles"}, status=status.HTTP_404_NOT_FOUND)
+            
+            data = {
+                'id': latest_metric.id,
+                'fecha': latest_metric.fecha.isoformat() if latest_metric.fecha else None,
+                'hora': latest_metric.hora.strftime('%H:%M:%S') if latest_metric.hora else None,
+                'ritmo_cardiaco': latest_metric.ritmo_cardiaco,
+                'presion': latest_metric.presion,
+                'oxigenacion': float(latest_metric.oxigenacion),
+                'sesion': latest_metric.sesion.id if latest_metric.sesion else None
+            }
+            return Response(data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

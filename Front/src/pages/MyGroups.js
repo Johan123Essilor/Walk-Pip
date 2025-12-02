@@ -14,10 +14,10 @@ const MyGroups = () => {
   const [error, setError] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
-  const [showMembersModal, setShowMembersModal] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState([]);
+  const [showMembersModal, setShowMembersModal] = useState(false);  const [availableUsers, setAvailableUsers] = useState([]);
   const [groupMembers, setGroupMembers] = useState({});
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [suggestedUsers, setSuggestedUsers] = useState([]);
 
   // Función para obtener grupos del usuario
   const fetchUserGroups = async () => {
@@ -115,6 +115,46 @@ const MyGroups = () => {
       setAvailableUsers([]);
     } finally {
       setLoadingUsers(false);
+    }
+  };
+
+  // Función para obtener usuarios sugeridos (similares)
+  const fetchSuggestedUsers = async () => {
+    try {
+      console.log('🔄 Obteniendo usuarios sugeridos...');
+      
+      // Primero obtener el ID del usuario actual
+      const currentUserResponse = await fetch(`${API_BASE_URL}/users/`);
+      if (!currentUserResponse.ok) {
+        throw new Error(`Error HTTP ${currentUserResponse.status}`);
+      }
+      
+      const allUsers = await currentUserResponse.json();
+      const currentUser = allUsers.find(u => 
+        (u.correo || u.email) === user?.email
+      );
+      
+      if (!currentUser) {
+        console.warn('No se encontró el usuario actual');
+        return;
+      }
+
+      // Llamar al endpoint de usuarios similares
+      const response = await fetch(`${API_BASE_URL}/users/similares/${currentUser.id}/`);
+      if (!response.ok) {
+        console.warn('Endpoint de sugerencias no disponible aún');
+        setSuggestedUsers([]);
+        return;
+      }
+
+      const suggestionsData = await response.json();
+      console.log('✅ Usuarios sugeridos obtenidos:', suggestionsData);
+      
+      setSuggestedUsers(suggestionsData || []);
+
+    } catch (error) {
+      console.error('❌ Error obteniendo usuarios sugeridos:', error);
+      setSuggestedUsers([]);
     }
   };
 
@@ -232,7 +272,10 @@ const MyGroups = () => {
   // Función para gestionar miembros de un grupo
   const manageGroupMembers = async (group) => {
     setSelectedGroup(group);
-    await fetchAvailableUsers();
+    await Promise.all([
+      fetchAvailableUsers(),
+      fetchSuggestedUsers()
+    ]);
     setShowMembersModal(true);
   };
 
@@ -432,13 +475,12 @@ const MyGroups = () => {
           onCancel={() => setShowCreateForm(false)}
           userEmail={user?.email}
         />
-      )}
-
-      {/* Modal para gestionar miembros */}
+      )}      {/* Modal para gestionar miembros */}
       {showMembersModal && selectedGroup && (
         <GroupMembersModal
           group={selectedGroup}
           availableUsers={availableUsers}
+          suggestedUsers={suggestedUsers}
           loadingUsers={loadingUsers}
           currentMembers={groupMembers[selectedGroup.id] || []}
           onInviteUser={inviteUserToGroup}
@@ -541,6 +583,7 @@ const CreateGroupModal = ({ onSubmit, onCancel, userEmail }) => {
 const GroupMembersModal = ({ 
   group, 
   availableUsers, 
+  suggestedUsers,
   loadingUsers, 
   currentMembers, 
   onInviteUser, 
@@ -609,9 +652,7 @@ const GroupMembersModal = ({
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* Invitar nuevos miembros */}
+            </div>            {/* Invitar nuevos miembros */}
             <div>
               <h6>Invitar Nuevos Miembros</h6>
               {loadingUsers ? (
@@ -652,8 +693,46 @@ const GroupMembersModal = ({
                         </button>
                       </div>
                     );
-                  })}
-                </div>
+                  })}                </div>
+              )}
+            </div>
+
+            {/* Sugerencias del algoritmo */}
+            <div className="mt-4">
+              <h6>Sugerencias (usuarios parecidos a ti)</h6>
+              
+              {suggestedUsers.length === 0 ? (
+                <p className="text-muted">No hay sugerencias disponibles por ahora.</p>
+              ) : (
+                suggestedUsers.map((u) => (
+                  <div 
+                    key={u.id} 
+                    className="d-flex justify-content-between align-items-center p-2 border rounded mt-2"
+                  >
+                    <div>
+                      <strong>{u.nombre || u.username || 'Usuario'}</strong>
+                      <br />
+                      <small className="text-muted">{u.correo || u.email}</small>
+                    </div>
+
+                    <button
+                      className="btn btn-sm btn-success"
+                      onClick={() => handleInviteUser(u)}
+                      disabled={isUserAlreadyMember(u) || invitingUser === u.id}
+                    >
+                      {invitingUser === u.id ? (
+                        <>
+                          <Spinner size="sm" className="me-1" />
+                          Invitando...
+                        </>
+                      ) : isUserAlreadyMember(u) ? (
+                        'Ya es miembro'
+                      ) : (
+                        'Invitar'
+                      )}
+                    </button>
+                  </div>
+                ))
               )}
             </div>
           </div>

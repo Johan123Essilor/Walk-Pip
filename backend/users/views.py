@@ -151,17 +151,139 @@ class UsuarioViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        # Devolver todos los usuarios activos
+        # Devuelve todos los usuarios activos ordenados
         return Usuario.objects.filter(is_active=True).order_by('nombre', 'correo')
 
-    def list(self, request, *args, **kwargs):
+    @action(detail=True, methods=['get'], url_path='similares')
+    def usuarios_similares(self, request, pk=None):
         """
-        Devuelve lista de usuarios con información básica para agregar a grupos
+        Devuelve usuarios similares basados en clustering ML.
         """
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-    
+        try:
+            import os
+            import joblib
+            from sklearn.metrics.pairwise import cosine_similarity
+
+            usuario_actual = self.get_object()
+
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            ML_MODELS_DIR = os.path.join(BASE_DIR, 'ml_model')
+
+            modelo_path = os.path.join(ML_MODELS_DIR, 'modelo_caminata.pkl')
+            scaler_path = os.path.join(ML_MODELS_DIR, 'scaler_caminata.pkl')
+
+            try:
+                modelo = joblib.load(modelo_path)
+                scaler = joblib.load(scaler_path)
+
+                usuarios_candidatos = Usuario.objects.filter(is_active=True).exclude(id=usuario_actual.id)
+
+                if not usuarios_candidatos.exists():
+                    return Response({
+                        'usuarios': [],
+                        'algoritmo': 'ml_clustering',
+                        'total': 0,
+                        'mensaje': 'No hay usuarios disponibles para comparar'
+                    })
+
+                caracteristicas_actual = self._extraer_caracteristicas_usuario(usuario_actual)
+
+                usuarios_con_similitud = []
+
+                for usuario in usuarios_candidatos:
+                    try:
+                        caracteristicas_candidato = self._extraer_caracteristicas_usuario(usuario)
+
+                        f_actual = scaler.transform([caracteristicas_actual])
+                        f_cand = scaler.transform([caracteristicas_candidato])
+
+                        similitud = cosine_similarity(f_actual, f_cand)[0][0]
+
+                        usuarios_con_similitud.append({
+                            'usuario': usuario,
+                            'similitud': float(similitud)
+                        })
+
+                    except:
+                        continue
+
+                usuarios_con_similitud.sort(key=lambda x: x['similitud'], reverse=True)
+                usuarios_similares = [u['usuario'] for u in usuarios_con_similitud[:5]]
+
+                serializer = self.get_serializer(usuarios_similares, many=True)
+
+                return Response({
+                    'usuarios': serializer.data,
+                    'algoritmo': 'ml_clustering',
+                    'total': len(serializer.data),
+                    'similitudes': [round(u['similitud'], 3) for u in usuarios_con_similitud[:5]]
+                })
+
+            except FileNotFoundError:
+                return self._algoritmo_mvp_fallback(usuario_actual)
+
+        except Usuario.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=404)
+        except Exception as e:
+            return Response({'error': f'Error interno: {str(e)}'}, status=500)
+
+    def _extraer_caracteristicas_usuario(self, usuario):
+        """
+        Extrae características para el modelo ML.
+        """
+        from trail.models import HistorialUsuarioRuta
+
+        historial = HistorialUsuarioRuta.objects.filter(usuario=usuario)
+
+        edad = usuario.edad or 25
+        total_rutas = historial.count()
+        rutas_completadas = historial.filter(resultado='completado').count()
+
+        satisfaccion_promedio = 3.0
+        if historial.exists():
+            valores = {
+                'muy_satisfecho': 5,
+                'satisfecho': 4,
+                'neutral': 3,
+                'insatisfecho': 2,
+                'muy_insatisfecho': 1,
+            }
+            nums = [valores.get(h.satisfaccion, 3) for h in historial]
+            satisfaccion_promedio = sum(nums) / len(nums)
+
+        nivel_actividad = 3.0
+        salud = usuario.salud_set.first()
+        if salud and salud.nivel_actividad:
+            nivel_actividad = float(salud.nivel_actividad)
+
+        return [
+            edad,
+            total_rutas,
+            rutas_completadas,
+            satisfaccion_promedio,
+            nivel_actividad,
+        ]
+
+    def _algoritmo_mvp_fallback(self, usuario_actual):
+        """
+        Fallback si no hay modelo ML.
+        """
+        edad_min = max(18, (usuario_actual.edad or 25) - 5)
+        edad_max = min(80, (usuario_actual.edad or 25) + 5)
+
+        usuarios_similares = Usuario.objects.filter(
+            is_active=True,
+            edad__gte=edad_min,
+            edad__lte=edad_max
+        ).exclude(id=usuario_actual.id).order_by('?')[:5]
+
+        serializer = self.get_serializer(usuarios_similares, many=True)
+
+        return Response({
+            'usuarios': serializer.data,
+            'algoritmo': 'edad_similar_mvp_fallback',
+            'total': len(serializer.data)
+        })
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     permission_classes = [AllowAny]

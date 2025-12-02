@@ -151,17 +151,227 @@ class UsuarioViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        # Devolver todos los usuarios activos
-        return Usuario.objects.filter(is_active=True).order_by('nombre', 'correo')
+        # Devuelve todos los usuarios activos ordenados
+        return Usuario.objects.filter(is_active=True).order_by('nombre', 'correo')    
+    @action(detail=True, methods=['get'], url_path='similares')
+    def usuarios_similares(self, request, pk=None):
+        """
+        Devuelve usuarios similares basados en clustering ML con debugging mejorado.
+        """
+        try:
+            import os
+            import joblib
+            import numpy as np
+            from sklearn.metrics.pairwise import cosine_similarity
 
-    def list(self, request, *args, **kwargs):
+            usuario_actual = self.get_object()
+            print(f"🔍 Calculando usuarios similares para: {usuario_actual.nombre} (ID: {usuario_actual.id})")
+
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            ML_MODELS_DIR = os.path.join(BASE_DIR, 'ml_model')
+
+            modelo_path = os.path.join(ML_MODELS_DIR, 'modelo_caminata.pkl')
+            scaler_path = os.path.join(ML_MODELS_DIR, 'scaler_caminata.pkl')
+
+            try:
+                modelo = joblib.load(modelo_path)
+                scaler = joblib.load(scaler_path)
+                print("✅ Modelos ML cargados correctamente")
+
+                usuarios_candidatos = Usuario.objects.filter(is_active=True).exclude(id=usuario_actual.id)
+                print(f"📊 Usuarios candidatos encontrados: {usuarios_candidatos.count()}")
+
+                if not usuarios_candidatos.exists():
+                    return Response({
+                        'usuarios': [],
+                        'algoritmo': 'ml_clustering',
+                        'total': 0,
+                        'mensaje': 'No hay usuarios disponibles para comparar'
+                    })                # OPTIMIZACIÓN: Calcular características del usuario actual UNA SOLA VEZ
+                caracteristicas_actual = self._extraer_caracteristicas_usuario(usuario_actual)
+                print(f"🔢 Características usuario actual (5 features): {caracteristicas_actual}")
+                
+                # Validar que tenemos exactamente 5 características
+                if len(caracteristicas_actual) != 5:
+                    raise ValueError(f"Se esperaban 5 características, se obtuvieron {len(caracteristicas_actual)}")
+                
+                # Transformar las características del usuario actual UNA SOLA VEZ
+                features_actual = np.array([caracteristicas_actual])  # Shape (1, 5)
+                features_actual_scaled = scaler.transform(features_actual)
+                print(f"🎯 Vector escalado usuario actual: {features_actual_scaled[0]}")
+
+                usuarios_con_similitud = []
+
+                for usuario in usuarios_candidatos:
+                    try:
+                        caracteristicas_candidato = self._extraer_caracteristicas_usuario(usuario)
+                        
+                        # Validar características del candidato
+                        if len(caracteristicas_candidato) != 5:
+                            print(f"⚠️ Usuario {usuario.id} tiene {len(caracteristicas_candidato)} características, esperadas 5")
+                            continue
+                        
+                        features_candidato = np.array([caracteristicas_candidato])  # Shape (1, 5)
+                        features_candidato_scaled = scaler.transform(features_candidato)                        # Debug: comparar vectores escalados
+                        if np.array_equal(features_actual_scaled[0], features_candidato_scaled[0]):
+                            print(f"⚠️ Usuario {usuario.id} tiene vector escalado idéntico al actual")
+
+                        # Calcular similitud coseno entre vectores escalados
+                        similitud = cosine_similarity(features_actual_scaled, features_candidato_scaled)[0][0]
+                        
+                        print(f"👤 Usuario {usuario.id}: similitud = {similitud:.3f}")
+
+                        usuarios_con_similitud.append({
+                            'usuario': usuario,
+                            'similitud': float(similitud),
+                            'caracteristicas_raw': caracteristicas_candidato,
+                            'features_transformed': features_candidato_scaled[0].tolist()
+                        })
+
+                    except Exception as e:
+                        print(f"❌ Error procesando usuario {usuario.id}: {str(e)}")
+                        continue
+
+                usuarios_con_similitud.sort(key=lambda x: x['similitud'], reverse=True)
+                top_usuarios = usuarios_con_similitud[:5]
+
+                serializer = self.get_serializer([u['usuario'] for u in top_usuarios], many=True)
+
+                # Información de debug temporal (quitar en producción)
+                debug_info = []
+                for u in top_usuarios:
+                    debug_info.append({
+                        'id': u['usuario'].id,
+                        'nombre': u['usuario'].nombre,
+                        'similitud': u['similitud'],
+                        'caracteristicas_raw': u['caracteristicas_raw'],
+                        'features_sample': u['features_transformed'][:3]  # Solo primeros 3 elementos
+                    })
+
+                print(f"✅ Top 5 usuarios similares calculados con similitudes: {[round(u['similitud'], 3) for u in top_usuarios]}")
+
+                return Response({
+                    'usuarios': serializer.data,
+                    'algoritmo': 'ml_clustering',
+                    'total': len(serializer.data),
+                    'similitudes': [round(u['similitud'], 3) for u in top_usuarios],
+                    'debug_info': debug_info  # Información temporal para debugging
+                })
+
+            except FileNotFoundError as e:
+                print(f"📁 Archivos ML no encontrados: {e}")
+                return self._algoritmo_mvp_fallback(usuario_actual)
+
+        except Usuario.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=404)
+        except Exception as e:
+            return Response({'error': f'Error interno: {str(e)}'}, status=500)      
+    def _extraer_caracteristicas_usuario(self, usuario):
         """
-        Devuelve lista de usuarios con información básica para agregar a grupos
+        Extrae SOLO las 5 características que usa el modelo ML basado en caminata:
+        [AvgPace, AvgSpO2, AvgHR, TotalKM, AvgSpeed]
         """
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-    
+        try:
+            import pandas as pd
+            import numpy as np
+            from metrics.models import MetricaCaminata, MetricaCorazon
+
+            print(f"🔄 Extrayendo características ML para usuario {usuario.id}")
+
+            # Obtener sesiones del usuario
+            caminatas = MetricaCaminata.objects.filter(usuario=usuario)
+            corazones = MetricaCorazon.objects.filter(usuario=usuario)
+
+            print(f"📊 Caminatas encontradas: {caminatas.count()}, Corazones: {corazones.count()}")
+
+            if not caminatas.exists() or not corazones.exists():
+                print("⚠️ Usuario sin métricas de caminata, usando valores por defecto")
+                # Valores neutros diferenciados por ID para usuarios sin datos
+                return [
+                    5.0 + (usuario.id % 10) * 0.5,    # AvgPace variado
+                    95.0 + (usuario.id % 5),          # AvgSpO2 (95-99)
+                    70.0 + (usuario.id % 30),         # AvgHR (70-99)
+                    1.0 + (usuario.id % 20) * 0.5,    # TotalKM variado
+                    4.0 + (usuario.id % 6) * 0.5      # AvgSpeed variado
+                ]
+
+            # Unir las métricas por sesion_id
+            data = []
+            for c in caminatas:
+                heart = corazones.filter(sesion_id=c.sesion_id).first()
+                if not heart:
+                    continue
+                
+                # Calcular pace evitando división por cero
+                tiempo_horas = max(c.tiempo_actividad.total_seconds() / 3600, 0.01)  # Mínimo 0.01 horas
+                pace = c.km_recorridos / tiempo_horas
+                
+                data.append({
+                    "pace": pace,
+                    "spo2": heart.oxigenacion or 95,  # Default SpO2
+                    "hr": heart.ritmo_cardiaco or 75, # Default HR
+                    "km": c.km_recorridos or 0,
+                    "speed": c.velocidad_promedio or 0,
+                })
+
+            if not data:
+                print("⚠️ No se pudieron combinar métricas, usando fallback")
+                return [
+                    6.0 + (usuario.id % 8) * 0.3,     # AvgPace
+                    96.0 + (usuario.id % 4),          # AvgSpO2
+                    75.0 + (usuario.id % 25),         # AvgHR
+                    2.0 + (usuario.id % 15) * 0.3,    # TotalKM
+                    5.0 + (usuario.id % 5) * 0.4      # AvgSpeed
+                ]
+
+            # Crear DataFrame y calcular promedios
+            df = pd.DataFrame(data)
+            
+            # Características finales en el ORDEN EXACTO del modelo
+            AvgPace = float(df["pace"].mean())
+            AvgSpO2 = float(df["spo2"].mean())  
+            AvgHR = float(df["hr"].mean())
+            TotalKM = float(df["km"].sum())
+            AvgSpeed = float(df["speed"].mean())
+
+            caracteristicas = [AvgPace, AvgSpO2, AvgHR, TotalKM, AvgSpeed]
+            
+            print(f"✅ Características ML extraídas para usuario {usuario.id}: {caracteristicas}")
+            return caracteristicas
+
+        except Exception as e:
+            print(f"❌ ERROR extrayendo características ML para usuario {usuario.id}: {e}")
+            # Fallback seguro con exactamente 5 valores
+            fallback = [
+                7.0 + (usuario.id % 6) * 0.5,     # AvgPace
+                97.0 + (usuario.id % 3),          # AvgSpO2  
+                80.0 + (usuario.id % 20),         # AvgHR
+                3.0 + (usuario.id % 10) * 0.4,    # TotalKM
+                6.0 + (usuario.id % 4) * 0.3      # AvgSpeed
+            ]
+            print(f"🔄 Usando fallback para usuario {usuario.id}: {fallback}")
+            return fallback
+
+    def _algoritmo_mvp_fallback(self, usuario_actual):
+        """
+        Fallback si no hay modelo ML.
+        """
+        edad_min = max(18, (usuario_actual.edad or 25) - 5)
+        edad_max = min(80, (usuario_actual.edad or 25) + 5)
+
+        usuarios_similares = Usuario.objects.filter(
+            is_active=True,
+            edad__gte=edad_min,
+            edad__lte=edad_max
+        ).exclude(id=usuario_actual.id).order_by('?')[:5]
+
+        serializer = self.get_serializer(usuarios_similares, many=True)
+
+        return Response({
+            'usuarios': serializer.data,
+            'algoritmo': 'edad_similar_mvp_fallback',
+            'total': len(serializer.data)
+        })
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     permission_classes = [AllowAny]

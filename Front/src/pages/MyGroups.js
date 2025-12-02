@@ -117,32 +117,40 @@ const MyGroups = () => {
       setLoadingUsers(false);
     }
   };
-
   // Función para obtener usuarios sugeridos (similares)
-  const fetchSuggestedUsers = async () => {
+  const fetchSuggestedUsers = async (userId = null) => {
     try {
       console.log('🔄 Obteniendo usuarios sugeridos...');
       
-      // Primero obtener el ID del usuario actual
-      const currentUserResponse = await fetch(`${API_BASE_URL}/users/`);
-      if (!currentUserResponse.ok) {
-        throw new Error(`Error HTTP ${currentUserResponse.status}`);
-      }
+      let currentUserId = userId;
       
-      const allUsers = await currentUserResponse.json();
-      const currentUser = allUsers.find(u => 
-        (u.correo || u.email) === user?.email
-      );
-      
-      if (!currentUser) {
-        console.warn('No se encontró el usuario actual');
-        return;
+      // Si no se proporciona userId, obtener el ID del usuario actual
+      if (!currentUserId) {
+        const currentUserResponse = await fetch(`${API_BASE_URL}/users/`);
+        if (!currentUserResponse.ok) {
+          throw new Error(`Error HTTP ${currentUserResponse.status}`);
+        }
+        
+        const allUsers = await currentUserResponse.json();
+        const currentUser = allUsers.find(u => 
+          (u.correo || u.email) === user?.email
+        );
+        
+        if (!currentUser) {
+          console.warn('No se encontró el usuario actual');
+          setSuggestedUsers([]);
+          return;
+        }
+        
+        currentUserId = currentUser.id;
       }
 
-      // Llamar al endpoint de usuarios similares
-      const response = await fetch(`${API_BASE_URL}/users/similares/${currentUser.id}/`);
+      console.log(`🔍 Llamando endpoint: /users/${currentUserId}/similares/`);
+      
+      // Llamar al endpoint de usuarios similares (URL CORREGIDA)
+      const response = await fetch(`${API_BASE_URL}/users/${currentUserId}/similares/`);
       if (!response.ok) {
-        console.warn('Endpoint de sugerencias no disponible aún');
+        console.warn(`Error ${response.status}: Endpoint de sugerencias no disponible`);
         setSuggestedUsers([]);
         return;
       }
@@ -150,7 +158,8 @@ const MyGroups = () => {
       const suggestionsData = await response.json();
       console.log('✅ Usuarios sugeridos obtenidos:', suggestionsData);
       
-      setSuggestedUsers(suggestionsData || []);
+      // Extraer solo la lista de usuarios de la respuesta
+      setSuggestedUsers(suggestionsData.usuarios || []);
 
     } catch (error) {
       console.error('❌ Error obteniendo usuarios sugeridos:', error);
@@ -268,14 +277,25 @@ const MyGroups = () => {
       fetchUserGroups();
     }
   }, [isAuthenticated, user]);
-
   // Función para gestionar miembros de un grupo
   const manageGroupMembers = async (group) => {
+    console.log('🔄 Abriendo gestión de miembros para grupo:', group.id);
     setSelectedGroup(group);
-    await Promise.all([
-      fetchAvailableUsers(),
-      fetchSuggestedUsers()
-    ]);
+    
+    try {
+      await Promise.all([
+        fetchAvailableUsers(),
+        fetchSuggestedUsers()
+      ]);
+      
+      console.log('📊 Estado después de cargar datos:');
+      console.log('- availableUsers:', availableUsers.length);
+      console.log('- suggestedUsers:', suggestedUsers.length);
+      
+    } catch (error) {
+      console.error('❌ Error cargando datos para modal:', error);
+    }
+    
     setShowMembersModal(true);
   };
 
@@ -591,6 +611,7 @@ const GroupMembersModal = ({
   onMembersUpdate 
 }) => {
   const [invitingUser, setInvitingUser] = useState(null);
+  const [showAllUsers, setShowAllUsers] = useState(false);
 
   const handleInviteUser = async (userToInvite) => {
     try {
@@ -604,12 +625,16 @@ const GroupMembersModal = ({
     }
   };
 
-  const isUserAlreadyMember = (user) => {
-    return currentMembers.some(member => 
-      member.usuario?.correo === (user.correo || user.email) ||
-      member.usuario?.email === (user.correo || user.email)
-    );
-  };
+const isUserAlreadyMember = (user) => {
+  const correo = user.correo || user.email;
+  return currentMembers.some(member => {
+    const mCorreo = 
+      member.usuario_correo || 
+      member.usuario?.correo || 
+      member.usuario?.email;
+    return mCorreo === correo;
+  });
+};
 
   return (
     <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -652,87 +677,130 @@ const GroupMembersModal = ({
                   ))}
                 </div>
               )}
-            </div>            {/* Invitar nuevos miembros */}
-            <div>
-              <h6>Invitar Nuevos Miembros</h6>
-              {loadingUsers ? (
-                <div className="text-center py-3">
-                  <Spinner size="sm" color="success" />
-                  <span className="ms-2">Cargando usuarios...</span>
+            </div>            {/* SECCIÓN 1: Sugerencias Destacadas (AI/ML) */}
+            <div className="mb-4">              <div className="d-flex align-items-center mb-3">
+                <i className="fa fa-sparkles text-warning me-2"></i>
+                <h6 className="mb-0">
+                  <strong>Sugerencias Para Ti</strong>
+                </h6>
+                {/* <Badge color="info" className="ms-2">AI</Badge> */}
+              </div>
+              
+              {/* Debug temporal */}
+              {console.log('Renderizando sugerencias:', suggestedUsers)}
+              
+              {suggestedUsers.length === 0 ? (
+                <div className="text-center p-4 bg-light rounded">
+                  <i className="fa fa-robot text-muted mb-2" style={{ fontSize: '2rem' }}></i>
+                  <p className="text-muted mb-0">No hay sugerencias disponibles por ahora.</p>
+                  <small className="text-muted">Nuestro algoritmo está analizando usuarios similares...</small>
                 </div>
-              ) : availableUsers.length === 0 ? (
-                <p className="text-muted">No hay usuarios disponibles para invitar.</p>
-              ) : (
-                <div className="list-group">
-                  {availableUsers.map((user, index) => {
-                    const isAlreadyMember = isUserAlreadyMember(user);
-                    const isInviting = invitingUser === user.id;
-
-                    return (
-                      <div key={index} className="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                          <strong>{user.nombre || user.username || 'Usuario'}</strong>
-                          <br />
-                          <small className="text-muted">{user.correo || user.email}</small>
+              ) : (                <div className="list-group">
+                  {suggestedUsers.map((user) => (
+                    <div key={user.id} className="list-group-item d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong className="text-success">{user.nombre || user.username || 'Usuario'}</strong>
+                        <br />
+                        <small className="text-muted">{user.correo || user.email}</small>
+                        <br />
+                        <div className="d-flex align-items-center mt-1">
+                          <i className="fa fa-chart-line text-success me-1" style={{ fontSize: '0.8rem' }}></i>
+                          <small className="text-success">Compatible contigo</small>
+                          {/* <Badge color="info" size="sm" className="ms-2">AI</Badge> */}
                         </div>
-                        <button
-                          className={`btn btn-sm ${isAlreadyMember ? 'btn-outline-secondary' : 'btn-success'}`}
-                          onClick={() => handleInviteUser(user)}
-                          disabled={isAlreadyMember || isInviting}
-                        >
-                          {isInviting ? (
-                            <>
-                              <Spinner size="sm" className="me-1" />
-                              Invitando...
-                            </>
-                          ) : isAlreadyMember ? (
-                            'Ya es miembro'
-                          ) : (
-                            'Invitar'
-                          )}
-                        </button>
                       </div>
-                    );
-                  })}                </div>
+                      <button
+                        className={`btn btn-sm ${
+                          isUserAlreadyMember(user) 
+                            ? 'btn-outline-secondary' 
+                            : 'btn-success'
+                        }`}
+                        onClick={() => handleInviteUser(user)}
+                        disabled={isUserAlreadyMember(user) || invitingUser === user.id}
+                      >
+                        {invitingUser === user.id ? (
+                          <>
+                            <Spinner size="sm" className="me-1" />
+                            Invitando...
+                          </>
+                        ) : isUserAlreadyMember(user) ? (
+                          'Ya es miembro'
+                        ) : (
+                          'Invitar'
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Sugerencias del algoritmo */}
-            <div className="mt-4">
-              <h6>Sugerencias (usuarios parecidos a ti)</h6>
-              
-              {suggestedUsers.length === 0 ? (
-                <p className="text-muted">No hay sugerencias disponibles por ahora.</p>
-              ) : (
-                suggestedUsers.map((u) => (
-                  <div 
-                    key={u.id} 
-                    className="d-flex justify-content-between align-items-center p-2 border rounded mt-2"
-                  >
-                    <div>
-                      <strong>{u.nombre || u.username || 'Usuario'}</strong>
-                      <br />
-                      <small className="text-muted">{u.correo || u.email}</small>
-                    </div>
+            {/* SECCIÓN 2: Todos los usuarios disponibles (colapsible) */}
+            <div className="border-top pt-4">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h6 className="mb-0">
+                  <i className="fa fa-users me-2"></i>
+                  Todos los Usuarios
+                </h6>
+                <button
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => setShowAllUsers(!showAllUsers)}
+                  type="button"
+                >
+                  <i className={`fa fa-${showAllUsers ? 'chevron-up' : 'chevron-down'} me-1`}></i>
+                  {showAllUsers ? 'Ocultar' : 'Mostrar'} ({availableUsers.length})
+                </button>
+              </div>
 
-                    <button
-                      className="btn btn-sm btn-success"
-                      onClick={() => handleInviteUser(u)}
-                      disabled={isUserAlreadyMember(u) || invitingUser === u.id}
-                    >
-                      {invitingUser === u.id ? (
-                        <>
-                          <Spinner size="sm" className="me-1" />
-                          Invitando...
-                        </>
-                      ) : isUserAlreadyMember(u) ? (
-                        'Ya es miembro'
-                      ) : (
-                        'Invitar'
-                      )}
-                    </button>
-                  </div>
-                ))
+              {showAllUsers && (
+                <>
+                  {loadingUsers ? (
+                    <div className="text-center py-4">
+                      <Spinner size="sm" color="primary" />
+                      <span className="ms-2">Cargando usuarios...</span>
+                    </div>
+                  ) : availableUsers.length === 0 ? (
+                    <div className="text-center p-4 bg-light rounded">
+                      <i className="fa fa-users text-muted mb-2" style={{ fontSize: '2rem' }}></i>
+                      <p className="text-muted mb-0">No hay usuarios disponibles para invitar.</p>
+                    </div>
+                  ) : (
+                    <div className="list-group" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      {availableUsers
+                        .filter(user => !suggestedUsers.some(suggested => suggested.id === user.id))
+                        .map((user, index) => {
+                          const isAlreadyMember = isUserAlreadyMember(user);
+                          const isInviting = invitingUser === user.id;
+
+                          return (
+                            <div key={index} className="list-group-item d-flex justify-content-between align-items-center">
+                              <div>
+                                <strong>{user.nombre || user.username || 'Usuario'}</strong>
+                                <br />
+                                <small className="text-muted">{user.correo || user.email}</small>
+                              </div>
+                              <button
+                                className={`btn btn-sm ${isAlreadyMember ? 'btn-outline-secondary' : 'btn-primary'}`}
+                                onClick={() => handleInviteUser(user)}
+                                disabled={isAlreadyMember || isInviting}
+                              >
+                                {isInviting ? (
+                                  <>
+                                    <Spinner size="sm" className="me-1" />
+                                    Invitando...
+                                  </>
+                                ) : isAlreadyMember ? (
+                                  'Ya es miembro'
+                                ) : (
+                                  'Invitar'
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

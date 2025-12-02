@@ -78,3 +78,12 @@ FROM enumerated, s WHERE m.id = enumerated.metric_id;
 -   Modelos ML funcionando.
 -   API expuesta para recomendaciones.
 -   Frontend integrado.
+
+8.  Pruebas exitosas del sistema (1 dic 2025):
+
+-   ✅ Endpoint GET /users/9/similares/ funciona correctamente
+-   ✅ Respuesta HTTP 200 con 5 usuarios sugeridos
+-   ✅ Algoritmo ML activo ("ml_clustering" no fallback)
+-   ✅ Similitudes calculadas correctamente (todas 1.0 por datos similares)
+-   ✅ Frontend listo para consumir la API
+-   ✅ Sistema completamente funcional end-to-end

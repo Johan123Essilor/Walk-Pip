@@ -13,6 +13,8 @@ import AboutPage from './pages/AboutPage';
 import { fetchTrails } from './features/trails/trailsSlice';
 import UserProfile from './pages/UserProfile';
 import ProfileOnboarding from './components/ProfileOnboarding';
+import MyGroups from './pages/MyGroups';
+import GroupInvitation from './pages/GroupInvitation';
 import MyAppointments from './pages/MyAppointments';
 import RouteHistory from './pages/RouteHistory';
 import { useDispatch } from 'react-redux';
@@ -20,6 +22,8 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useProfileCheck } from './hooks/useProfileCheck';
 
 import { RutasSenderismo } from './pages/RutasSenderismo';
+import Dashboard from './pages/Dashboard';
+import Graficas from './pages/Graficas';
 
 function App() {
   const dispatch = useDispatch();
@@ -32,11 +36,11 @@ function App() {
   }, [dispatch]);
 
   // Determinar si mostrar el onboarding
-  const showOnboarding = isAuthenticated && 
-                        !isLoading && 
-                        !profileLoading && 
-                        !hasHealthData && 
-                        !onboardingCompleted;
+  const showOnboarding = isAuthenticated &&
+    !isLoading &&
+    !profileLoading &&
+    !hasHealthData &&
+    !onboardingCompleted;
 
   console.log('🔍 Estado de la aplicación:', {
     isAuthenticated,
@@ -75,7 +79,7 @@ function App() {
   return (
     <div className="App">
       <Header />
-      
+
       {/* MOSTRAR ONBOARDING SOLO EN PRIMERA VEZ */}
       {showOnboarding ? (
         <ProfileOnboarding onComplete={handleOnboardingComplete} />
@@ -89,12 +93,16 @@ function App() {
           <Route path='/safety' element={<SafetyPage />} />
           <Route path='/about-us' element={<AboutPage />} />
           <Route path='/user-profile' element={<UserProfile />} />
+          <Route path='/my-groups' element={<MyGroups />} />
+          <Route path='/groups/invitations/' element={<GroupInvitation />} />
           <Route path='/my-appointments' element={<MyAppointments />} />
           <Route path='/list-routes' element={<RutasSenderismo />} />
           <Route path='/my-history' element={<RouteHistory />} />
+          <Route path='/dashboard' element={<Dashboard />} />
+          <Route path='/graficas' element={<Graficas />} />
         </Routes>
       )}
-      
+
       <Footer />
     </div>
   );

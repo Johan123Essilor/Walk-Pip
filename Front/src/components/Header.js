@@ -98,6 +98,18 @@ const Header = () => {
                                             <i className='fa fa-user fa-lg' /> Perfil
                                         </a>
                                     </li>
+                                       <li className='my-2'>
+                                        <a className='dropdown-item' href='/my-groups'>
+                                            <i className='fa fa-users fa-lg' /> Mis Grupos
+                                        </a>
+                                    </li>
+                                    <li className='my-2'>
+                                        <a className='dropdown-item' href='/groups/invitations'>
+                                            <i className='fa fa-envelope fa-lg' /> Invitaciones
+                                            {/* Podrías agregar un badge con invitaciones pendientes */}
+                                            {/* <span className="badge bg-warning ms-1">3</span> */}
+                                        </a>
+                                    </li>
                                      <li className='my-2'>
                                             <a className='dropdown-item' href='/my-appointments'>
                                                 <i className='fa fa-calendar fa-lg' /> Mis Citas

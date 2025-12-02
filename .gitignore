@@ -30,7 +30,6 @@ temp/
 
 # Drivers descargados por webdriver-manager
 .wdm/
-
 node_modules/ 
 front/node_modules/ 
 __pycache__/ 

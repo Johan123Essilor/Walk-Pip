@@ -114,10 +114,14 @@ const Header = () => {
                                             <a className='dropdown-item' href='/my-appointments'>
                                                 <i className='fa fa-calendar fa-lg' /> Mis Citas
                                             </a>
-                                        </li>
-                                           <li className='my-2'>
+                                        </li>                                           <li className='my-2'>
                                             <a className='dropdown-item' href='/my-history'>
                                                 <i className='fa fa-history fa-lg' /> Mi Historial
+                                            </a>
+                                        </li>
+                                        <li className='my-2'>
+                                            <a className='dropdown-item' href='/graficas'>
+                                                <i className='fa fa-chart-bar fa-lg' /> Gráficas
                                             </a>
                                         </li>
                                         <li><hr className="dropdown-divider" />

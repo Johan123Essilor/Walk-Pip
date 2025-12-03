@@ -120,6 +120,11 @@ const Header = () => {
                                                 <i className='fa fa-history fa-lg' /> Mi Historial
                                             </a>
                                         </li>
+                                        <li className='my-2'>
+                                            <a className='dropdown-item' href='/graficas'>
+                                                <i className='fa fa-chart-bar fa-lg' /> Gráficas
+                                            </a>
+                                        </li>
                                         <li><hr className="dropdown-divider" />
                                         <div className="dropdown-item-text small">
                                             {djangoUser ? (

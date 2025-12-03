@@ -58,12 +58,14 @@ class SensorService {
         }
     }
 
-    // Obtener historial para gráficas
-    async getHeartHistory(timeRange = '1h') {
+    // Obtener historial para gráficas (usa los endpoints base sin `latest` ni `session`)
+    // Si se pasa un timeRange se lo añade como query param, pero por defecto llama al endpoint sin filtros
+    async getHeartHistory(timeRange = null) {
         try {
-            console.log(`📊 Obteniendo historial corazón (${timeRange})...`);
-            const response = await api.get(`/metrics/corazon/?time_range=${timeRange}`);
-            console.log('❤️ Datos corazón recibidos:', response.data.length, 'registros');
+            const url = timeRange ? `/metrics/corazon/?time_range=${timeRange}` : `/metrics/corazon/`;
+            console.log(`📊 Obteniendo historial corazón desde ${url} ...`);
+            const response = await api.get(url);
+            console.log('❤️ Datos corazón recibidos:', (response.data && response.data.length) || 0, 'registros');
             return response.data || [];
         } catch (error) {
             console.error('❌ Error obteniendo historial corazón:', error);
@@ -71,11 +73,12 @@ class SensorService {
         }
     }
 
-    async getWalkHistory(timeRange = '1h') {
+    async getWalkHistory(timeRange = null) {
         try {
-            console.log(`📊 Obteniendo historial caminata (${timeRange})...`);
-            const response = await api.get(`/metrics/caminata/?time_range=${timeRange}`);
-            console.log('🚶 Datos caminata recibidos:', response.data.length, 'registros');
+            const url = timeRange ? `/metrics/caminata/?time_range=${timeRange}` : `/metrics/caminata/`;
+            console.log(`📊 Obteniendo historial caminata desde ${url} ...`);
+            const response = await api.get(url);
+            console.log('🚶 Datos caminata recibidos:', (response.data && response.data.length) || 0, 'registros');
             return response.data || [];
         } catch (error) {
             console.error('❌ Error obteniendo historial caminata:', error);

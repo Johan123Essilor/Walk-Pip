@@ -23,14 +23,22 @@ const Graficas = () => {
             setError(null);
 
             console.log('🔄 Actualizando gráficas...');
+            // Llamamos a los endpoints base sin usar `latest` ni `session`
             const [heartResponse, walkResponse] = await Promise.all([
-                sensorService.getHeartHistory(timeRange),
-                sensorService.getWalkHistory(timeRange)
+                sensorService.getHeartHistory(),
+                sensorService.getWalkHistory()
             ]);
 
             // Invertir orden para mostrar de antiguo a reciente en gráfica
-            setHeartHistory(heartResponse.reverse ? heartResponse.reverse() : heartResponse);
-            setWalkHistory(walkResponse.reverse ? walkResponse.reverse() : walkResponse);
+            const hr = (Array.isArray(heartResponse) ? [...heartResponse] : []);
+            const wk = (Array.isArray(walkResponse) ? [...walkResponse] : []);
+
+            // Backend devuelve normalmente más recientes primero; queremos ordenar de antiguo -> reciente
+            if (hr.length > 1) hr.reverse();
+            if (wk.length > 1) wk.reverse();
+
+            setHeartHistory(hr);
+            setWalkHistory(wk);
             setLastUpdate(new Date().toLocaleTimeString('es-ES'));
 
             console.log('✅ Gráficas actualizadas');
@@ -50,22 +58,60 @@ const Graficas = () => {
         return () => clearInterval(intervalId);
     }, [fetchChartData]);
 
-    // Datos de ejemplo para las gráficas (debes adaptar según tu API)
-    const ritmoCardiacoData = heartHistory && heartHistory.length > 0
-        ? heartHistory.map(item => ({
-            hora: item.hora || item.fecha || 'N/A',
-            ritmo: item.ritmo_cardiaco || 0,
-            oxigenacion: parseFloat(item.oxigenacion) || 0
-        }))
+    // Normalizar datos para gráficas a partir de los endpoints base
+    // Mostrar solo los 10 registros más recientes para evitar sobrecarga visual
+    const recentHeart = Array.isArray(heartHistory) ? heartHistory.slice(-10) : [];
+    const recentWalk = Array.isArray(walkHistory) ? walkHistory.slice(-10) : [];
+
+    const ritmoCardiacoData = recentHeart && recentHeart.length > 0
+        ? recentHeart.map(item => {
+            // El endpoint de corazón devuelve { fecha: 'YYYY-MM-DD', hora: 'HH:MM:SS' }
+            // o en algunos casos hora con T. Normalizamos a una etiqueta legible.
+            let label = 'N/A';
+            if (item.hora && item.hora.includes('T')) {
+                // si ya es ISO
+                const d = new Date(item.hora);
+                label = d.toLocaleTimeString('es-ES');
+            } else if (item.fecha && item.hora) {
+                const iso = `${item.fecha}T${item.hora}`;
+                const d = new Date(iso);
+                if (!isNaN(d)) label = d.toLocaleTimeString('es-ES');
+                else label = `${item.fecha} ${item.hora}`;
+            } else if (item.hora) {
+                label = item.hora;
+            } else if (item.fecha) {
+                label = item.fecha;
+            }
+
+            return {
+                hora: label,
+                ritmo: item.ritmo_cardiaco || 0,
+                oxigenacion: parseFloat(item.oxigenacion) || 0
+            };
+        })
         : [];
 
-    const actividadData = walkHistory && walkHistory.length > 0
-        ? walkHistory.map(item => ({
-            hora: item.hora || 'N/A',
-            pasos: item.pasos || 0,
-            velocidad: parseFloat(item.velocidad_promedio) || 0,
-            calorias: parseFloat(item.calorias_quemadas) || 0
-        }))
+    const actividadData = recentWalk && recentWalk.length > 0
+        ? recentWalk.map(item => {
+            // El endpoint de caminata devuelve 'hora' en formato ISO. Convertimos a hora local legible.
+            let label = 'N/A';
+            if (item.hora) {
+                try {
+                    const d = new Date(item.hora);
+                    if (!isNaN(d)) label = d.toLocaleTimeString('es-ES');
+                    else label = item.hora;
+                } catch (e) {
+                    label = item.hora;
+                }
+            }
+
+            return {
+                hora: label,
+                pasos: item.pasos || 0,
+                velocidad: parseFloat(item.velocidad_promedio) || 0,
+                calorias: parseFloat(item.calorias_quemadas) || 0
+            };
+        })
         : [];
 
     const colores = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];

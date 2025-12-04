@@ -159,7 +159,7 @@ const EditProfile = ({ isOpen, toggle, userData, healthData, medicalConditions, 
             },
             body: JSON.stringify({
               user_email: user.email,
-              condicion_id: conditionId
+              condicion: conditionId
             })
           });
         }

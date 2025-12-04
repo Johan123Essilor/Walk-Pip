@@ -68,6 +68,7 @@ const UserProfile = () => {
       const response = await fetch(`${API_BASE_URL}/users/usuario-condiciones/?user_email=${user.email}`);
       if (response.ok) {
         const userConditions = await response.json();
+        console.log('User Conditions:', userConditions);
         return userConditions;
       }
       return [];
@@ -95,7 +96,7 @@ const UserProfile = () => {
   // Función para combinar condiciones del usuario con nombres
   const combineUserConditions = (userConditions, allConditions) => {
     return userConditions.map(userCond => {
-      const conditionId = userCond.id || userCond.condicion || userCond.id_condicion;
+     const conditionId = userCond.condicion_id;
       const conditionInfo = allConditions.find(cond => cond.id === conditionId);
 
       return {

@@ -585,6 +585,15 @@ class UsuarioCondicionViewSet(viewsets.ModelViewSet):
         if getattr(self, 'swagger_fake_view', False):
             return UsuarioCondicion.objects.none()
         return UsuarioCondicion.objects.all()
+    
+    # def destroy(self, request, *args, **kwargs):
+    #     instancia = self.get_object()
+
+    #     # NO eliminar => solo responder que "se marcó como eliminado"
+    #     return Response(
+    #         {"mensaje": "Operación DELETE recibida, pero no se eliminó ningún dato."},
+    #         status=status.HTTP_200_OK
+    #     )
 
     # Ya no necesitamos perform_create porque el serializer maneja la creación
 

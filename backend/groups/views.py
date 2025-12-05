@@ -42,22 +42,24 @@ class GrupoViewSet(viewsets.ModelViewSet):
     # QUERYSET BASE
     # --------------------------
     def get_queryset(self):
-        if getattr(self, 'swagger_fake_view', False):
-            return Grupo.objects.none()
-        
+    # Si es un endpoint detail=True, no filtres por usuario
+        if self.action in ['retrieve', 'accept_invitation', 'reject_invitation', 'members', 'leave', 'schedule_activity']:
+            return Grupo.objects.all()
+
+    # Para endpoints que sí necesitan filtrar por user_email
         user_email = self.request.data.get('user_email') or self.request.query_params.get('user_email')
         if not user_email:
             return Grupo.objects.none()
 
         try:
             usuario = Usuario.objects.get(correo=user_email)
-        # ✅ SOLO grupos donde el usuario es CREADOR o ha ACEPTADO la invitación
             return Grupo.objects.filter(
                 Q(creador=usuario) |
-                Q(usuariogrupo__usuario=usuario, usuariogrupo__aceptado=True)  # ← Solo miembros aceptados
-            ).select_related('creador').distinct()
+                Q(usuariogrupo__usuario=usuario, usuariogrupo__aceptado=True)
+            ).distinct()
         except Usuario.DoesNotExist:
             return Grupo.objects.none()
+
 
     # --------------------------
     # OBTENER USUARIO POR EMAIL

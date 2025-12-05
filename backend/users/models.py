@@ -89,6 +89,9 @@ class UsuarioCondicion(models.Model):
     class Meta:
         db_table = 'usuario_condicion'
 
+    def __str__(self):
+        return f"{self.usuario.correo} - {self.condicion.id}"
+
 class Review(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     ruta = models.ForeignKey(Ruta, on_delete=models.CASCADE)

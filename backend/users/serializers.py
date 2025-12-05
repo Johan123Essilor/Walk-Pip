@@ -92,28 +92,31 @@ class CondicionSerializer(serializers.ModelSerializer):
 
 
 class UsuarioCondicionSerializer(serializers.ModelSerializer):
+    # GET
+    usuario_id = serializers.IntegerField(source='usuario.id', read_only=True)
+    condicion_id = serializers.IntegerField(source='condicion.id', read_only=True)
+
+    # POST
     user_email = serializers.EmailField(write_only=True)
-    condicion_id = serializers.PrimaryKeyRelatedField(
-        queryset=Condicion.objects.all(), 
-        source='condicion', 
+    condicion = serializers.PrimaryKeyRelatedField(
+        queryset=Condicion.objects.all(),
         write_only=True
     )
 
     class Meta:
         model = UsuarioCondicion
-        fields = ['id', 'user_email', 'condicion_id']
+        fields = ['id', 'user_email', 'usuario_id', 'condicion_id', 'condicion']
 
     def create(self, validated_data):
         user_email = validated_data.pop('user_email')
-        condicion = validated_data.pop('condicion')  # Esto viene de condicion_id
-        
+        condicion = validated_data.pop('condicion')
+
         try:
             usuario = Usuario.objects.get(correo=user_email)
         except Usuario.DoesNotExist:
             raise serializers.ValidationError({"error": "Usuario no encontrado"})
-        
+
         return UsuarioCondicion.objects.create(
             usuario=usuario,
             condicion=condicion
         )
-

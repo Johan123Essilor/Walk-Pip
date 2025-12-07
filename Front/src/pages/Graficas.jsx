@@ -1,367 +1,349 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+// Graficas.jsx - Versión SIN EFECTOS HOVER
+import React, { useState, useEffect } from 'react';
 import sensorService from '../services/sensorService';
-
-// Importar componentes de gráficas (usaremos Chart.js o similar)
 import {
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    BarChart, Bar, PieChart, Pie, Cell
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 
 const Graficas = () => {
-    const [heartHistory, setHeartHistory] = useState([]);
-    const [walkHistory, setWalkHistory] = useState([]);
+    const [corazonData, setCorazonData] = useState([]);
+    const [caminataData, setCaminataData] = useState([]);
+    const [resumen, setResumen] = useState({});
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [timeRange, setTimeRange] = useState('1h'); // 1h, 6h, 24h
     const [lastUpdate, setLastUpdate] = useState(null);
-    const [refreshing, setRefreshing] = useState(false);
 
-    const fetchChartData = useCallback(async () => {
+    const fetchData = async () => {
         try {
-            setRefreshing(true);
-            setError(null);
+            const data = await sensorService.getDashboardData();
 
-            console.log('🔄 Actualizando gráficas...');
-            // Llamamos a los endpoints base sin usar `latest` ni `session`
-            const [heartResponse, walkResponse] = await Promise.all([
-                sensorService.getHeartHistory(),
-                sensorService.getWalkHistory()
-            ]);
-
-            // Invertir orden para mostrar de antiguo a reciente en gráfica
-            const hr = (Array.isArray(heartResponse) ? [...heartResponse] : []);
-            const wk = (Array.isArray(walkResponse) ? [...walkResponse] : []);
-
-            // Backend devuelve normalmente más recientes primero; queremos ordenar de antiguo -> reciente
-            if (hr.length > 1) hr.reverse();
-            if (wk.length > 1) wk.reverse();
-
-            setHeartHistory(hr);
-            setWalkHistory(wk);
+            setCorazonData(data.corazon);
+            setCaminataData(data.caminata);
+            setResumen(data.resumen);
             setLastUpdate(new Date().toLocaleTimeString('es-ES'));
 
-            console.log('✅ Gráficas actualizadas');
-        } catch (err) {
-            console.error('❌ Error fetching chart data:', err);
-            setError(err.message || 'Error al cargar datos');
+        } catch (error) {
+            console.error('Error:', error);
         } finally {
-            setRefreshing(false);
             setLoading(false);
         }
-    }, [timeRange]);
+    };
 
     useEffect(() => {
-        fetchChartData();
-        // Actualizar cada 2 segundos en lugar de 5
-        const intervalId = setInterval(fetchChartData, 2000);
-        return () => clearInterval(intervalId);
-    }, [fetchChartData]);
+        fetchData();
+        // Actualizar cada 3 segundos
+        const interval = setInterval(fetchData, 3000);
+        return () => clearInterval(interval);
+    }, []);
 
-    // Normalizar datos para gráficas a partir de los endpoints base
-    // Mostrar solo los 10 registros más recientes para evitar sobrecarga visual
-    const recentHeart = Array.isArray(heartHistory) ? heartHistory.slice(-10) : [];
-    const recentWalk = Array.isArray(walkHistory) ? walkHistory.slice(-10) : [];
+    // Preparar datos para gráficas
+    const graficaCorazon = corazonData.map(item => ({
+        hora: item.hora ? item.hora.split(':')[0] + ':' + item.hora.split(':')[1] : '--:--',
+        ritmo: item.ritmo_cardiaco || 0,
+        oxigenacion: item.oxigenacion || 0
+    })).reverse();
 
-    const ritmoCardiacoData = recentHeart && recentHeart.length > 0
-        ? recentHeart.map(item => {
-            // El endpoint de corazón devuelve { fecha: 'YYYY-MM-DD', hora: 'HH:MM:SS' }
-            // o en algunos casos hora con T. Normalizamos a una etiqueta legible.
-            let label = 'N/A';
-            if (item.hora && item.hora.includes('T')) {
-                // si ya es ISO
-                const d = new Date(item.hora);
-                label = d.toLocaleTimeString('es-ES');
-            } else if (item.fecha && item.hora) {
-                const iso = `${item.fecha}T${item.hora}`;
-                const d = new Date(iso);
-                if (!isNaN(d)) label = d.toLocaleTimeString('es-ES');
-                else label = `${item.fecha} ${item.hora}`;
-            } else if (item.hora) {
-                label = item.hora;
-            } else if (item.fecha) {
-                label = item.fecha;
-            }
-
-            return {
-                hora: label,
-                ritmo: item.ritmo_cardiaco || 0,
-                oxigenacion: parseFloat(item.oxigenacion) || 0
-            };
-        })
-        : [];
-
-    const actividadData = recentWalk && recentWalk.length > 0
-        ? recentWalk.map(item => {
-            // El endpoint de caminata devuelve 'hora' en formato ISO. Convertimos a hora local legible.
-            let label = 'N/A';
-            if (item.hora) {
-                try {
-                    const d = new Date(item.hora);
-                    if (!isNaN(d)) label = d.toLocaleTimeString('es-ES');
-                    else label = item.hora;
-                } catch (e) {
-                    label = item.hora;
-                }
-            }
-
-            return {
-                hora: label,
-                pasos: item.pasos || 0,
-                velocidad: parseFloat(item.velocidad_promedio) || 0,
-                calorias: parseFloat(item.calorias_quemadas) || 0
-            };
-        })
-        : [];
-
-    const colores = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+    const graficaPasos = caminataData.map(item => ({
+        hora: item.timestamp ? new Date(item.timestamp).toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : '--:--',
+        pasos: item.pasos || 0,
+        km: item.km_recorridos || 0
+    })).reverse();
 
     if (loading) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
                 <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando gráficas...</span>
+                    <span className="visually-hidden">Cargando...</span>
                 </div>
-                <span className="ms-2">Cargando gráficas...</span>
-            </div>
-        );
-    }
-
-    if (error && heartHistory.length === 0 && walkHistory.length === 0) {
-        return (
-            <div className="container-fluid mt-4">
-                <div className="alert alert-warning" role="alert">
-                    <h4 className="alert-heading">⚠️ Sin datos disponibles</h4>
-                    <p>{error || 'No hay datos de métricas disponibles. Por favor, inicia una sesión de actividad primero.'}</p>
-                    <hr />
-                    <p className="mb-0">
-                        <Link to="/" className="btn btn-outline-primary btn-sm">
-                            ← Volver al Dashboard
-                        </Link>
-                    </p>
-                </div>
+                <span className="ms-2">Cargando métricas...</span>
             </div>
         );
     }
 
     return (
         <div className="container-fluid">
-            {/* Header */}
+            {/* Header SIMPLIFICADO - Sin botón */}
             <div className="row mb-4">
-                <div className="col">
-                    <h1 className="h2">📈 Gráficas de Métricas (Tiempo Real)</h1>
-                    <p className="text-muted">
-                        Análisis detallado y evolución temporal
+                <div className="col-12">
+                    <h1 className="h2 text-center">📈 Métricas en Tiempo Real</h1>
+                    <p className="text-muted text-center">
+                        Últimos 10 registros | Actualización cada 3 segundos
                         {lastUpdate && (
-                            <span className="ms-3" style={{ fontSize: '0.9rem', color: '#666' }}>
-                                {refreshing ? (
-                                    <>
-                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                        Actualizando...
-                                    </>
-                                ) : (
-                                    <>
-                                        ✅ Última actualización: <strong>{lastUpdate}</strong>
-                                    </>
-                                )}
+                            <span className="ms-2 text-success">
+                                ✅ {lastUpdate}
                             </span>
                         )}
                     </p>
                 </div>
-                <div className="col-auto">
-                    <Link to="/" className="btn btn-outline-primary">
-                        ← Volver al Dashboard
-                    </Link>
+            </div>
+
+            {/* Resumen de Totales - SIN HOVER NI EFECTOS */}
+            <div className="row mb-4">
+                <div className="col-md-3 col-6 mb-3">
+                    <div className="card text-center border-primary"
+                        style={{
+                            boxShadow: 'none',
+                            border: '2px solid #007bff',
+                            transition: 'none',
+                            transform: 'none'
+                        }}>
+                        <div className="card-body" style={{ pointerEvents: 'none' }}>
+                            <h2 className="text-primary">❤️</h2>
+                            <h5>Ritmo Cardíaco</h5>
+                            <h3 className="text-primary">
+                                {resumen.corazon?.ultimo_ritmo || 0} <small>bpm</small>
+                            </h3>
+                            <small className="text-muted">
+                                Promedio: {Math.round(resumen.corazon?.promedio_ritmo || 0)} bpm
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-md-3 col-6 mb-3">
+                    <div className="card text-center border-success"
+                        style={{
+                            boxShadow: 'none',
+                            border: '2px solid #28a745',
+                            transition: 'none',
+                            transform: 'none'
+                        }}>
+                        <div className="card-body" style={{ pointerEvents: 'none' }}>
+                            <h2 className="text-success">🫁</h2>
+                            <h5>Oxigenación</h5>
+                            <h3 className="text-success">
+                                {resumen.corazon?.ultima_oxigenacion || 0} <small>%</small>
+                            </h3>
+                            <small className="text-muted">
+                                Promedio: {Math.round(resumen.corazon?.promedio_oxigenacion || 0)}%
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-md-3 col-6 mb-3">
+                    <div className="card text-center border-warning"
+                        style={{
+                            boxShadow: 'none',
+                            border: '2px solid #ffc107',
+                            transition: 'none',
+                            transform: 'none'
+                        }}>
+                        <div className="card-body" style={{ pointerEvents: 'none' }}>
+                            <h2 className="text-warning">👣</h2>
+                            <h5>Pasos Totales</h5>
+                            <h3 className="text-warning">
+                                {resumen.caminata?.total_pasos?.toLocaleString() || 0}
+                            </h3>
+                            <small className="text-muted">
+                                Últimos: {resumen.caminata?.ultimos_pasos || 0} pasos
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-md-3 col-6 mb-3">
+                    <div className="card text-center border-danger"
+                        style={{
+                            boxShadow: 'none',
+                            border: '2px solid #dc3545',
+                            transition: 'none',
+                            transform: 'none'
+                        }}>
+                        <div className="card-body" style={{ pointerEvents: 'none' }}>
+                            <h2 className="text-danger">🔥</h2>
+                            <h5>Calorías</h5>
+                            <h3 className="text-danger">
+                                {Math.round(resumen.caminata?.total_calorias || 0)} <small>kcal</small>
+                            </h3>
+                            <small className="text-muted">
+                                Últimas: {Math.round(resumen.caminata?.ultimas_calorias || 0)} kcal
+                            </small>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Controles de tiempo */}
+            {/* Gráficas de Corazón - SIN HOVER NI EFECTOS */}
             <div className="row mb-4">
+                <div className="col-md-6 mb-3">
+                    <div className="card"
+                        style={{
+                            boxShadow: 'none',
+                            border: '1px solid #dee2e6',
+                            transition: 'none',
+                            transform: 'none'
+                        }}>
+                        <div className="card-header bg-primary text-white">
+                            <h5 className="mb-0">❤️ Ritmo Cardíaco (Últimas 10 mediciones)</h5>
+                        </div>
+                        <div className="card-body" style={{ pointerEvents: 'none' }}>
+                            {graficaCorazon.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={250}>
+                                    <LineChart data={graficaCorazon}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                        <XAxis dataKey="hora" />
+                                        <YAxis domain={[50, 120]} />
+                                        <Tooltip />
+                                        <Legend />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="ritmo"
+                                            stroke="#ff6b6b"
+                                            strokeWidth={2}
+                                            name="Ritmo (bpm)"
+                                            dot={false}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="text-center py-5">
+                                    <p className="text-muted">No hay datos de ritmo cardíaco</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-md-6 mb-3">
+                    <div className="card"
+                        style={{
+                            boxShadow: 'none',
+                            border: '1px solid #dee2e6',
+                            transition: 'none',
+                            transform: 'none'
+                        }}>
+                        <div className="card-header bg-success text-white">
+                            <h5 className="mb-0">🫁 Oxigenación (Últimas 10 mediciones)</h5>
+                        </div>
+                        <div className="card-body" style={{ pointerEvents: 'none' }}>
+                            {graficaCorazon.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={250}>
+                                    <LineChart data={graficaCorazon}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                        <XAxis dataKey="hora" />
+                                        <YAxis domain={[85, 100]} />
+                                        <Tooltip />
+                                        <Legend />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="oxigenacion"
+                                            stroke="#4ecdc4"
+                                            strokeWidth={2}
+                                            name="Oxigenación (%)"
+                                            dot={false}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="text-center py-5">
+                                    <p className="text-muted">No hay datos de oxigenación</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Gráfica de Pasos y Distancia - SIN HOVER NI EFECTOS */}
+            <div className="row">
                 <div className="col-12">
-                    <div className="card">
-                        <div className="card-body">
-                            <div className="btn-group" role="group">
-                                <button
-                                    type="button"
-                                    className={`btn btn-outline-primary ${timeRange === '1h' ? 'active' : ''}`}
-                                    onClick={() => setTimeRange('1h')}
-                                >
-                                    1 Hora
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`btn btn-outline-primary ${timeRange === '6h' ? 'active' : ''}`}
-                                    onClick={() => setTimeRange('6h')}
-                                >
-                                    6 Horas
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`btn btn-outline-primary ${timeRange === '24h' ? 'active' : ''}`}
-                                    onClick={() => setTimeRange('24h')}
-                                >
-                                    24 Horas
-                                </button>
+                    <div className="card"
+                        style={{
+                            boxShadow: 'none',
+                            border: '1px solid #dee2e6',
+                            transition: 'none',
+                            transform: 'none'
+                        }}>
+                        <div className="card-header bg-warning text-white">
+                            <h5 className="mb-0">🚶 Actividad - Pasos y Distancia (Últimos 10 registros)</h5>
+                        </div>
+                        <div className="card-body" style={{ pointerEvents: 'none' }}>
+                            {graficaPasos.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <LineChart data={graficaPasos}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                        <XAxis dataKey="hora" />
+                                        <YAxis yAxisId="left" label={{ value: 'Pasos', angle: -90, position: 'insideLeft' }} />
+                                        <YAxis yAxisId="right" orientation="right" label={{ value: 'Km', angle: 90, position: 'insideRight' }} />
+                                        <Tooltip />
+                                        <Legend />
+                                        <Line
+                                            yAxisId="left"
+                                            type="monotone"
+                                            dataKey="pasos"
+                                            stroke="#ffd166"
+                                            strokeWidth={2}
+                                            name="Pasos"
+                                            dot={false}
+                                        />
+                                        <Line
+                                            yAxisId="right"
+                                            type="monotone"
+                                            dataKey="km"
+                                            stroke="#06d6a0"
+                                            strokeWidth={2}
+                                            name="Km Recorridos"
+                                            dot={false}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="text-center py-5">
+                                    <p className="text-muted">No hay datos de actividad</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="card-footer" style={{
+                            background: '#f8f9fa',
+                            borderTop: '1px solid #dee2e6',
+                            pointerEvents: 'none'
+                        }}>
+                            <div className="row text-center">
+                                <div className="col-md-4">
+                                    <h4 className="text-warning">
+                                        {resumen.caminata?.total_pasos?.toLocaleString() || 0}
+                                    </h4>
+                                    <small className="text-muted">Pasos Totales</small>
+                                </div>
+                                <div className="col-md-4">
+                                    <h4 className="text-success">
+                                        {Math.round(resumen.caminata?.total_km || 0)} km
+                                    </h4>
+                                    <small className="text-muted">Distancia Total</small>
+                                </div>
+                                <div className="col-md-4">
+                                    <h4 className="text-danger">
+                                        {Math.round(resumen.caminata?.total_calorias || 0)} kcal
+                                    </h4>
+                                    <small className="text-muted">Calorías Totales</small>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Gráficas de Salud Cardíaca */}
-            <div className="row mb-4">
-                <div className="col-md-6 mb-3">
-                    <div className="card border-0 shadow-sm h-100">
-                        <div className="card-header bg-primary text-white">
-                            <h5 className="card-title mb-0">❤️ Ritmo Cardíaco</h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={ritmoCardiacoData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="hora" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="ritmo"
-                                        stroke="#ff6b6b"
-                                        strokeWidth={2}
-                                        name="Ritmo (bpm)"
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-md-6 mb-3">
-                    <div className="card border-0 shadow-sm h-100">
-                        <div className="card-header bg-success text-white">
-                            <h5 className="card-title mb-0">🫁 Oxigenación</h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={ritmoCardiacoData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="hora" />
-                                    <YAxis domain={[80, 100]} />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="oxigenacion"
-                                        stroke="#4ecdc4"
-                                        strokeWidth={2}
-                                        name="Oxigenación (%)"
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Gráficas de Actividad */}
-            <div className="row mb-4">
-                <div className="col-md-6 mb-3">
-                    <div className="card border-0 shadow-sm h-100">
-                        <div className="card-header bg-warning text-white">
-                            <h5 className="card-title mb-0">🚶 Pasos por Hora</h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={actividadData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="hora" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar
-                                        dataKey="pasos"
-                                        fill="#ffd166"
-                                        name="Pasos"
-                                    />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="col-md-6 mb-3">
-                    <div className="card border-0 shadow-sm h-100">
-                        <div className="card-header bg-info text-white">
-                            <h5 className="card-title mb-0">🔥 Calorías Quemadas</h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={actividadData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="hora" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="calorias"
-                                        stroke="#ef476f"
-                                        strokeWidth={2}
-                                        name="Calorías"
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Gráfica combinada */}
-            <div className="row">
+            {/* Información adicional - ESTILO SIMPLE */}
+            {/* <div className="row mt-4">
                 <div className="col-12">
-                    <div className="card border-0 shadow-sm">
-                        <div className="card-header bg-secondary text-white">
-                            <h5 className="card-title mb-0">📊 Resumen de Actividad</h5>
-                        </div>
-                        <div className="card-body">
-                            <ResponsiveContainer width="100%" height={400}>
-                                <LineChart data={actividadData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="hora" />
-                                    <YAxis yAxisId="left" />
-                                    <YAxis yAxisId="right" orientation="right" />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Line
-                                        yAxisId="left"
-                                        type="monotone"
-                                        dataKey="pasos"
-                                        stroke="#ffd166"
-                                        strokeWidth={2}
-                                        name="Pasos"
-                                    />
-                                    <Line
-                                        yAxisId="right"
-                                        type="monotone"
-                                        dataKey="velocidad"
-                                        stroke="#118ab2"
-                                        strokeWidth={2}
-                                        name="Velocidad (km/h)"
-                                    />
-                                    <Line
-                                        yAxisId="left"
-                                        type="monotone"
-                                        dataKey="calorias"
-                                        stroke="#ef476f"
-                                        strokeWidth={2}
-                                        name="Calorías"
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+                    <div className="border rounded p-3" style={{
+                        background: '#e7f1ff',
+                        borderColor: '#cfe2ff',
+                        pointerEvents: 'none'
+                    }}>
+                        <h6>📊 Información del Sistema</h6>
+                        <ul className="mb-0" style={{ marginLeft: '20px' }}>
+                            <li>Mostrando las últimas 10 métricas de cada sensor</li>
+                            <li>Actualización automática cada 3 segundos</li>
+                            <li>Totales acumulados desde el inicio de la sesión</li>
+                            <li>Datos en tiempo real desde sensores MAX30105 y MPU6050</li>
+                        </ul>
                     </div>
                 </div>
-            </div>
+            </div> */}
         </div>
     );
 };

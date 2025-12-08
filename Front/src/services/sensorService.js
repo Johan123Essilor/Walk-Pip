@@ -89,6 +89,79 @@ class SensorService {
             throw new Error('Error inesperado');
         }
     }
+
+    // Obtener alertas con filtro por tipo
+    async getAlertas(tipo = null) {
+        try {
+            let url = '/metrics/alertas/';
+            if (tipo) {
+                url += `?tipo=${tipo}`;
+            }
+            const response = await api.get(url);
+            return response.data || { alertas: [], totales: { no_leidas: 0, totales: 0 } };
+        } catch (error) {
+            console.error('❌ Error obteniendo alertas:', error);
+            return { alertas: [], totales: { no_leidas: 0, totales: 0 } };
+        }
+    }
+
+    // Obtener estadísticas de alertas
+    async getEstadisticasAlertas() {
+        try {
+            const response = await api.get('/metrics/alertas/estadisticas/');
+            return response.data || {
+                total_alertas: 0,
+                por_tipo: {},
+                por_severidad: {},
+                ultimas_24h: 0
+            };
+        } catch (error) {
+            console.error('❌ Error obteniendo estadísticas:', error);
+            return {};
+        }
+    }
+
+    // Marcar alertas como leídas
+    async marcarAlertasLeidas() {
+        try {
+            await api.get('/metrics/alertas/?marcar_leidas=true');
+            return true;
+        } catch (error) {
+            console.error('❌ Error marcando alertas:', error);
+            return false;
+        }
+    }
+
+    // Obtener todo para el dashboard incluyendo alertas
+    async getDashboardData() {
+        try {
+            const [corazonData, caminataData, resumenData, alertasData] = await Promise.all([
+                this.getUltimasMetricasCorazon(),
+                this.getUltimasMetricasCaminata(),
+                this.getResumenMetricas(),
+                this.getAlertas()
+            ]);
+
+            return {
+                corazon: corazonData,
+                caminata: caminataData,
+                resumen: resumenData,
+                alertas: alertasData.alertas,
+                totalAlertasNoLeidas: alertasData.totales.no_leidas,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error('❌ Error cargando dashboard:', error);
+            return {
+                corazon: [],
+                caminata: [],
+                resumen: {},
+                alertas: [],
+                totalAlertasNoLeidas: 0,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
 }
 
 // Exportar una instancia del servicio (Singleton)

@@ -1,4 +1,4 @@
-// Graficas.jsx - Versión SIN EFECTOS HOVER
+// Graficas.jsx - Versión MEJORADA con alertas visibles
 import React, { useState, useEffect } from 'react';
 import sensorService from '../services/sensorService';
 import {
@@ -11,6 +11,9 @@ const Graficas = () => {
     const [resumen, setResumen] = useState({});
     const [loading, setLoading] = useState(true);
     const [lastUpdate, setLastUpdate] = useState(null);
+    const [alertas, setAlertas] = useState([]);
+    const [totalAlertasNoLeidas, setTotalAlertasNoLeidas] = useState(0);
+    const [mostrarTodasAlertas, setMostrarTodasAlertas] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -19,6 +22,8 @@ const Graficas = () => {
             setCorazonData(data.corazon);
             setCaminataData(data.caminata);
             setResumen(data.resumen);
+            setAlertas(data.alertas || []);
+            setTotalAlertasNoLeidas(data.totalAlertasNoLeidas || 0);
             setLastUpdate(new Date().toLocaleTimeString('es-ES'));
 
         } catch (error) {
@@ -34,6 +39,24 @@ const Graficas = () => {
         const interval = setInterval(fetchData, 3000);
         return () => clearInterval(interval);
     }, []);
+
+    // Función para marcar alertas como leídas
+    const marcarAlertasLeidas = async () => {
+        try {
+            await sensorService.marcarAlertasLeidas();
+            // Actualizar estado local
+            setAlertas(prev => prev.map(alerta => ({ ...alerta, leida: true })));
+            setTotalAlertasNoLeidas(0);
+        } catch (error) {
+            console.error('Error marcando alertas:', error);
+        }
+    };
+
+    // Filtrar alertas por tipo
+    const alertasRitmoAlto = alertas.filter(a => a.tipo === 'ritmo_alto');
+    const alertasRitmoBajo = alertas.filter(a => a.tipo === 'ritmo_bajo');
+    const alertasOxigenacion = alertas.filter(a => a.tipo === 'oxigenacion_baja');
+    const alertasInformativas = alertas.filter(a => a.tipo === 'info');
 
     // Preparar datos para gráficas
     const graficaCorazon = corazonData.map(item => ({
@@ -51,6 +74,30 @@ const Graficas = () => {
         km: item.km_recorridos || 0
     })).reverse();
 
+    // Obtener el valor actual de ritmo cardíaco para mostrar alerta visual
+    const ritmoActual = resumen.corazon?.ultimo_ritmo || 0;
+    const oxigenacionActual = resumen.corazon?.ultima_oxigenacion || 0;
+
+    // Determinar estado del ritmo cardíaco
+    const getEstadoRitmo = () => {
+        if (ritmoActual > 180) return { tipo: 'critico', texto: 'CRÍTICO', color: 'dark' };
+        if (ritmoActual > 160) return { tipo: 'alto', texto: 'ALTO', color: 'danger' };
+        if (ritmoActual < 50) return { tipo: 'bajo', texto: 'BAJO', color: 'warning' };
+        if (ritmoActual >= 110 && ritmoActual <= 140) return { tipo: 'optimo', texto: 'ÓPTIMO', color: 'success' };
+        return { tipo: 'normal', texto: 'NORMAL', color: 'info' };
+    };
+
+    // Determinar estado de oxigenación
+    const getEstadoOxigenacion = () => {
+        if (oxigenacionActual < 90) return { tipo: 'critico', texto: 'CRÍTICO', color: 'dark' };
+        if (oxigenacionActual < 92) return { tipo: 'bajo', texto: 'BAJO', color: 'danger' };
+        if (oxigenacionActual >= 95) return { tipo: 'optimo', texto: 'ÓPTIMO', color: 'success' };
+        return { tipo: 'normal', texto: 'NORMAL', color: 'info' };
+    };
+
+    const estadoRitmo = getEstadoRitmo();
+    const estadoOxigenacion = getEstadoOxigenacion();
+
     if (loading) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
@@ -64,7 +111,7 @@ const Graficas = () => {
 
     return (
         <div className="container-fluid">
-            {/* Header SIMPLIFICADO - Sin botón */}
+            {/* Header con indicador de alertas */}
             <div className="row mb-4">
                 <div className="col-12">
                     <h1 className="h2 text-center">📈 Métricas en Tiempo Real</h1>
@@ -75,50 +122,198 @@ const Graficas = () => {
                                 ✅ {lastUpdate}
                             </span>
                         )}
+                        {totalAlertasNoLeidas > 0 && (
+                            <span className="ms-2 badge bg-danger">
+                                🚨 {totalAlertasNoLeidas} alerta{totalAlertasNoLeidas !== 1 ? 's' : ''}
+                            </span>
+                        )}
                     </p>
                 </div>
             </div>
 
-            {/* Resumen de Totales - SIN HOVER NI EFECTOS */}
+            {/* SECCIÓN DE ALERTAS - Mejor organizada */}
+            {alertas.length > 0 && (
+                <div className="row mb-4">
+                    <div className="col-12">
+                        <div className="card"
+                            style={{
+                                boxShadow: 'none',
+                                border: '2px solid #dc3545',
+                                transition: 'none',
+                                transform: 'none'
+                            }}
+                        >
+                            <div className="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                                <h5 className="mb-0 d-flex align-items-center">
+                                    <span className="me-2">🚨</span>
+                                    Alertas de Monitoreo
+                                    <span className="badge bg-light text-danger ms-2">{alertas.length}</span>
+                                </h5>
+                                <div>
+                                    <button
+                                        className="btn btn-sm btn-light me-2"
+                                        onClick={() => setMostrarTodasAlertas(!mostrarTodasAlertas)}
+                                    >
+                                        {mostrarTodasAlertas ? 'Ver menos' : 'Ver todas'}
+                                    </button>
+                                    <button
+                                        className="btn btn-sm btn-light"
+                                        onClick={marcarAlertasLeidas}
+                                    >
+                                        Marcar como leídas
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="card-body">
+                                {/* Resumen de tipos de alertas */}
+                                <div className="row mb-3">
+                                    {alertasRitmoAlto.length > 0 && (
+                                        <div className="col-auto">
+                                            <span className="badge bg-danger me-2">
+                                                ❤️‍🔥 {alertasRitmoAlto.length} Ritmo Alto
+                                            </span>
+                                        </div>
+                                    )}
+                                    {alertasRitmoBajo.length > 0 && (
+                                        <div className="col-auto">
+                                            <span className="badge bg-warning me-2">
+                                                💙 {alertasRitmoBajo.length} Ritmo Bajo
+                                            </span>
+                                        </div>
+                                    )}
+                                    {alertasOxigenacion.length > 0 && (
+                                        <div className="col-auto">
+                                            <span className="badge bg-dark me-2">
+                                                🫁 {alertasOxigenacion.length} Oxigenación
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Lista de alertas */}
+                                <div className="row">
+                                    {(mostrarTodasAlertas ? alertas : alertas.slice(0, 4)).map((alerta, index) => (
+                                        <div className="col-md-6 col-lg-3 mb-3" key={alerta.id || index}>
+                                            <div className={`alert alert-${alerta.color} border-${alerta.color} h-100`}>
+                                                <div className="d-flex">
+                                                    <div className="me-2 fs-5">{alerta.icono}</div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div className="d-flex justify-content-between align-items-start">
+                                                            <strong>{alerta.tipo_display}</strong>
+                                                            <span className={`badge bg-${alerta.color === 'dark' ? 'light text-dark' : alerta.color}`}>
+                                                                {alerta.severidad}
+                                                            </span>
+                                                        </div>
+                                                        <div className="small mt-1">{alerta.mensaje}</div>
+                                                        <div className="text-muted mt-2">
+                                                            <small>
+                                                                {new Date(alerta.fecha_hora).toLocaleTimeString('es-ES', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {alertas.length > 4 && !mostrarTodasAlertas && (
+                                    <div className="text-center mt-2">
+                                        <button
+                                            className="btn btn-sm btn-outline-danger"
+                                            onClick={() => setMostrarTodasAlertas(true)}
+                                        >
+                                            Ver {alertas.length - 4} alertas más
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Resumen de Totales CON INDICADORES DE ESTADO */}
             <div className="row mb-4">
                 <div className="col-md-3 col-6 mb-3">
-                    <div className="card text-center border-primary"
+                    <div className={`card text-center border-${estadoRitmo.color}`}
                         style={{
                             boxShadow: 'none',
-                            border: '2px solid #007bff',
+                            border: `2px solid var(--bs-${estadoRitmo.color})`,
                             transition: 'none',
                             transform: 'none'
                         }}>
                         <div className="card-body" style={{ pointerEvents: 'none' }}>
-                            <h2 className="text-primary">❤️</h2>
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                <h2 className="text-primary">❤️</h2>
+                                <span className={`badge bg-${estadoRitmo.color}`}>
+                                    {estadoRitmo.texto}
+                                </span>
+                            </div>
                             <h5>Ritmo Cardíaco</h5>
                             <h3 className="text-primary">
-                                {resumen.corazon?.ultimo_ritmo || 0} <small>bpm</small>
+                                {ritmoActual} <small>bpm</small>
                             </h3>
                             <small className="text-muted">
                                 Promedio: {Math.round(resumen.corazon?.promedio_ritmo || 0)} bpm
                             </small>
+                            {estadoRitmo.tipo === 'alto' && (
+                                <div className="mt-2">
+                                    <small className="text-danger">
+                                        ⚠️ Considere disminuir el ritmo
+                                    </small>
+                                </div>
+                            )}
+                            {estadoRitmo.tipo === 'bajo' && (
+                                <div className="mt-2">
+                                    <small className="text-warning">
+                                        ⚠️ Verifique fatiga o deshidratación
+                                    </small>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 <div className="col-md-3 col-6 mb-3">
-                    <div className="card text-center border-success"
+                    <div className={`card text-center border-${estadoOxigenacion.color}`}
                         style={{
                             boxShadow: 'none',
-                            border: '2px solid #28a745',
+                            border: `2px solid var(--bs-${estadoOxigenacion.color})`,
                             transition: 'none',
                             transform: 'none'
                         }}>
                         <div className="card-body" style={{ pointerEvents: 'none' }}>
-                            <h2 className="text-success">🫁</h2>
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                <h2 className="text-success">🫁</h2>
+                                <span className={`badge bg-${estadoOxigenacion.color}`}>
+                                    {estadoOxigenacion.texto}
+                                </span>
+                            </div>
                             <h5>Oxigenación</h5>
                             <h3 className="text-success">
-                                {resumen.corazon?.ultima_oxigenacion || 0} <small>%</small>
+                                {oxigenacionActual} <small>%</small>
                             </h3>
                             <small className="text-muted">
                                 Promedio: {Math.round(resumen.corazon?.promedio_oxigenacion || 0)}%
                             </small>
+                            {estadoOxigenacion.tipo === 'bajo' && (
+                                <div className="mt-2">
+                                    <small className="text-danger">
+                                        ⚠️ Considere descansar y respirar profundamente
+                                    </small>
+                                </div>
+                            )}
+                            {estadoOxigenacion.tipo === 'critico' && (
+                                <div className="mt-2">
+                                    <small className="text-dark">
+                                        ⚠️ ¡Busque aire fresco inmediatamente!
+                                    </small>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -166,6 +361,7 @@ const Graficas = () => {
                 </div>
             </div>
 
+            {/* Resto del código se mantiene igual */}
             {/* Gráficas de Corazón - SIN HOVER NI EFECTOS */}
             <div className="row mb-4">
                 <div className="col-md-6 mb-3">
@@ -185,7 +381,7 @@ const Graficas = () => {
                                     <LineChart data={graficaCorazon}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                                         <XAxis dataKey="hora" />
-                                        <YAxis domain={[50, 120]} />
+                                        <YAxis domain={[50, 180]} />
                                         <Tooltip />
                                         <Legend />
                                         <Line
@@ -325,25 +521,6 @@ const Graficas = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Información adicional - ESTILO SIMPLE */}
-            {/* <div className="row mt-4">
-                <div className="col-12">
-                    <div className="border rounded p-3" style={{
-                        background: '#e7f1ff',
-                        borderColor: '#cfe2ff',
-                        pointerEvents: 'none'
-                    }}>
-                        <h6>📊 Información del Sistema</h6>
-                        <ul className="mb-0" style={{ marginLeft: '20px' }}>
-                            <li>Mostrando las últimas 10 métricas de cada sensor</li>
-                            <li>Actualización automática cada 3 segundos</li>
-                            <li>Totales acumulados desde el inicio de la sesión</li>
-                            <li>Datos en tiempo real desde sensores MAX30105 y MPU6050</li>
-                        </ul>
-                    </div>
-                </div>
-            </div> */}
         </div>
     );
 };

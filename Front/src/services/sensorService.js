@@ -1,144 +1,84 @@
+// sensorService.js - Versión SIMPLIFICADA
 import api from './api';
 
 class SensorService {
 
-    // Obtener último registro de corazón
-    async getHeartMetrics() {
+    // Obtener últimas 10 métricas de corazón
+    async getUltimasMetricasCorazon() {
         try {
-            const response = await api.get('/metrics/corazon/latest/');
-            return response.data;
+            const response = await api.get('/metrics/metricas/corazon/ultimas/');
+            return response.data || [];
         } catch (error) {
-            // Si falla, intentar con el list normal y tomar el último
-            try {
-                const response = await api.get('/metrics/corazon/');
-                if (response.data && response.data.length > 0) {
-                    return response.data[response.data.length - 1];
-                }
-                throw new Error('No hay datos de corazón');
-            } catch (fallbackError) {
-                throw this.handleError(error);
-            }
+            console.error('❌ Error obteniendo métricas de corazón:', error);
+            return []; // Devolver array vacío en caso de error
         }
     }
 
-    // Obtener último registro de caminata
-    async getWalkMetrics() {
+    // Obtener últimas 10 métricas de caminata
+    async getUltimasMetricasCaminata() {
         try {
-            const response = await api.get('/metrics/caminata/latest/');
-            return response.data;
+            const response = await api.get('/metrics/metricas/caminata/ultimas/');
+            return response.data || [];
         } catch (error) {
-            // Si falla, intentar con el list normal y tomar el último
-            try {
-                const response = await api.get('/metrics/caminata/');
-                if (response.data && response.data.length > 0) {
-                    return response.data[response.data.length - 1];
-                }
-                throw new Error('No hay datos de caminata');
-            } catch (fallbackError) {
-                throw this.handleError(error);
-            }
+            console.error('❌ Error obteniendo métricas de caminata:', error);
+            return [];
         }
     }
 
-    // Obtener todos los datos combinados para el dashboard
-    async getLatestSensorData() {
+    // Obtener resumen total
+    async getResumenMetricas() {
         try {
-            const [heartData, walkData] = await Promise.all([
-                this.getHeartMetrics(),
-                this.getWalkMetrics()
+            const response = await api.get('/metrics/metricas/resumen/');
+            return response.data || {};
+        } catch (error) {
+            console.error('❌ Error obteniendo resumen:', error);
+            return {
+                caminata: {
+                    total_pasos: 0,
+                    total_km: 0,
+                    total_calorias: 0,
+                    promedio_velocidad: 0,
+                    ultimos_pasos: 0,
+                    ultimos_km: 0,
+                    ultimas_calorias: 0
+                },
+                corazon: {
+                    promedio_ritmo: 0,
+                    promedio_oxigenacion: 0,
+                    ultimo_ritmo: 0,
+                    ultima_oxigenacion: 0
+                }
+            };
+        }
+    }
+
+    // Obtener todo para el dashboard (simultáneo)
+    async getDashboardData() {
+        try {
+            const [corazonData, caminataData, resumenData] = await Promise.all([
+                this.getUltimasMetricasCorazon(),
+                this.getUltimasMetricasCaminata(),
+                this.getResumenMetricas()
             ]);
 
             return {
-                heart: heartData,
-                walk: walkData,
+                corazon: corazonData,
+                caminata: caminataData,
+                resumen: resumenData,
                 timestamp: new Date().toISOString()
             };
         } catch (error) {
-            throw this.handleError(error);
+            console.error('❌ Error cargando dashboard:', error);
+            return {
+                corazon: [],
+                caminata: [],
+                resumen: {},
+                timestamp: new Date().toISOString()
+            };
         }
     }
 
-    // Obtener historial para gráficas (usa los endpoints base sin `latest` ni `session`)
-    // Si se pasa un timeRange se lo añade como query param, pero por defecto llama al endpoint sin filtros
-    async getHeartHistory(timeRange = null) {
-        try {
-            const url = timeRange ? `/metrics/corazon/?time_range=${timeRange}` : `/metrics/corazon/`;
-            console.log(`📊 Obteniendo historial corazón desde ${url} ...`);
-            const response = await api.get(url);
-            console.log('❤️ Datos corazón recibidos:', (response.data && response.data.length) || 0, 'registros');
-            return response.data || [];
-        } catch (error) {
-            console.error('❌ Error obteniendo historial corazón:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    async getWalkHistory(timeRange = null) {
-        try {
-            const url = timeRange ? `/metrics/caminata/?time_range=${timeRange}` : `/metrics/caminata/`;
-            console.log(`📊 Obteniendo historial caminata desde ${url} ...`);
-            const response = await api.get(url);
-            console.log('🚶 Datos caminata recibidos:', (response.data && response.data.length) || 0, 'registros');
-            return response.data || [];
-        } catch (error) {
-            console.error('❌ Error obteniendo historial caminata:', error);
-            throw this.handleError(error);
-        }
-    }
-
-    // Obtener estadísticas de sesión
-    async getSessionStats() {
-        try {
-            const response = await api.get('/metrics/caminata/session_stats/');
-            return response.data;
-        } catch (error) {
-            // Fallback: calcular estadísticas básicas desde los endpoints normales
-            try {
-                const [heartResponse, walkResponse] = await Promise.all([
-                    api.get('/metrics/corazon/'),
-                    api.get('/metrics/caminata/')
-                ]);
-
-                const heartData = heartResponse.data;
-                const walkData = walkResponse.data;
-
-                const stats = {
-                    data_count: heartData.length + walkData.length,
-                    session_duration: this.calculateSessionDuration(walkData),
-                    total_pasos: walkData.reduce((sum, item) => sum + item.pasos, 0),
-                    total_calorias: walkData.reduce((sum, item) => sum + parseFloat(item.calorias_quemadas), 0),
-                    total_km: walkData.reduce((sum, item) => sum + parseFloat(item.km_recorridos), 0),
-                    max_ritmo: Math.max(...heartData.map(item => item.ritmo_cardiaco)),
-                    min_ritmo: Math.min(...heartData.map(item => item.ritmo_cardiaco)),
-                    max_oxigenacion: Math.max(...heartData.map(item => parseFloat(item.oxigenacion))),
-                    min_oxigenacion: Math.min(...heartData.map(item => parseFloat(item.oxigenacion)))
-                };
-
-                return stats;
-            } catch (fallbackError) {
-                throw this.handleError(error);
-            }
-        }
-    }
-
-    // Calcular duración de sesión basada en tiempo_actividad
-    calculateSessionDuration(walkData) {
-        if (walkData.length === 0) return 0;
-
-        let totalSeconds = 0;
-        walkData.forEach(item => {
-            if (item.tiempo_actividad) {
-                const timeParts = item.tiempo_actividad.split(':');
-                if (timeParts.length === 3) {
-                    totalSeconds += (+timeParts[0]) * 3600 + (+timeParts[1]) * 60 + (+timeParts[2]);
-                }
-            }
-        });
-
-        return totalSeconds;
-    }
-
-    // Manejo de errores
+    // Manejo simple de errores
     handleError(error) {
         console.error('Sensor Service Error:', error);
         if (error.response) {
@@ -147,6 +87,79 @@ class SensorService {
             throw new Error('No se pudo conectar al servidor');
         } else {
             throw new Error('Error inesperado');
+        }
+    }
+
+    // Obtener alertas con filtro por tipo
+    async getAlertas(tipo = null) {
+        try {
+            let url = '/metrics/alertas/';
+            if (tipo) {
+                url += `?tipo=${tipo}`;
+            }
+            const response = await api.get(url);
+            return response.data || { alertas: [], totales: { no_leidas: 0, totales: 0 } };
+        } catch (error) {
+            console.error('❌ Error obteniendo alertas:', error);
+            return { alertas: [], totales: { no_leidas: 0, totales: 0 } };
+        }
+    }
+
+    // Obtener estadísticas de alertas
+    async getEstadisticasAlertas() {
+        try {
+            const response = await api.get('/metrics/alertas/estadisticas/');
+            return response.data || {
+                total_alertas: 0,
+                por_tipo: {},
+                por_severidad: {},
+                ultimas_24h: 0
+            };
+        } catch (error) {
+            console.error('❌ Error obteniendo estadísticas:', error);
+            return {};
+        }
+    }
+
+    // Marcar alertas como leídas
+    async marcarAlertasLeidas() {
+        try {
+            await api.get('/metrics/alertas/?marcar_leidas=true');
+            return true;
+        } catch (error) {
+            console.error('❌ Error marcando alertas:', error);
+            return false;
+        }
+    }
+
+    // Obtener todo para el dashboard incluyendo alertas
+    async getDashboardData() {
+        try {
+            const [corazonData, caminataData, resumenData, alertasData] = await Promise.all([
+                this.getUltimasMetricasCorazon(),
+                this.getUltimasMetricasCaminata(),
+                this.getResumenMetricas(),
+                this.getAlertas()
+            ]);
+
+            return {
+                corazon: corazonData,
+                caminata: caminataData,
+                resumen: resumenData,
+                alertas: alertasData.alertas,
+                totalAlertasNoLeidas: alertasData.totales.no_leidas,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error('❌ Error cargando dashboard:', error);
+            return {
+                corazon: [],
+                caminata: [],
+                resumen: {},
+                alertas: [],
+                totalAlertasNoLeidas: 0,
+                timestamp: new Date().toISOString()
+            };
         }
     }
 }

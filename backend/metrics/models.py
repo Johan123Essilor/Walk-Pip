@@ -1,3 +1,4 @@
+from django.utils.timezone import now
 from django.db import models
 from users.models import Usuario
 from django.conf import settings
@@ -45,4 +46,36 @@ class MetricaCorazon(models.Model):
 
     def __str__(self):
         return f"{self.sesion.usuario} - {self.ritmo_cardiaco} bpm"
+    
+
+class AlertaMonitoreo(models.Model):
+    TIPO_ALERTA_CHOICES = [
+        ('ritmo_alto', 'Ritmo cardíaco alto'),
+        ('ritmo_bajo', 'Ritmo cardíaco bajo'),
+        ('oxigenacion_baja', 'Oxigenación baja'),
+        ('inactividad', 'Inactividad prolongada'),
+        ('info', 'Información'),
+    ]
+
+    tipo_alerta = models.CharField(max_length=20, choices=TIPO_ALERTA_CHOICES)
+    mensaje = models.TextField()
+    ritmo_cardiaco = models.IntegerField(null=True, blank=True)
+    oxigenacion = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True)
+    severidad = models.CharField(max_length=10, choices=[
+        ('baja', 'Baja'),
+        ('media', 'Media'),
+        ('alta', 'Alta'),
+        ('critica', 'Crítica')
+    ], default='media')
+    fecha_hora = models.DateTimeField(default=now)
+    leida = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-fecha_hora']
+        verbose_name = "Alerta de Monitoreo"
+        verbose_name_plural = "Alertas de Monitoreo"
+
+    def _str_(self):
+        return f"{self.get_tipo_alerta_display()} - {self.fecha_hora.strftime('%H:%M')}"
 
